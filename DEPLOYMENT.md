@@ -131,7 +131,7 @@ FIREBASE_SERVICE_ACCOUNT = [Incolla il JSON del service account]
 
 #### 📤 **Push generico (no frontend/backend)**:
 
-- Nessun deploy automatico
+- Nessun deploy automatico.
 
 ---
 
