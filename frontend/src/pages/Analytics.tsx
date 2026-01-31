@@ -180,10 +180,15 @@ export default function Analytics() {
     URL.revokeObjectURL(url);
   };
 
-  // Prepara dati per pie chart categorie
+  // Prepara dati per pie chart categorie - traduzione tipi
+  const categoryTypeLabels: Record<string, string> = {
+    Assets: "Asset",
+    Liabilities: "Passività",
+  };
+  
   const categoryData =
     analytics.categoryBreakdown?.map((cat: any) => ({
-      name: cat.categoryType,
+      name: categoryTypeLabels[cat.categoryType] || cat.categoryType,
       value: cat.value,
       percentage: cat.percentage,
     })) || [];
@@ -299,11 +304,9 @@ export default function Analytics() {
                     <Pie
                       data={categoryData}
                       cx="50%"
-                      cy="50%"
+                      cy="40%"
                       labelLine={false}
-                      label={(entry) =>
-                        `${entry.name}: ${entry.percentage.toFixed(1)}%`
-                      }
+                      label={false}
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
@@ -317,6 +320,13 @@ export default function Analytics() {
                     </Pie>
                     <Tooltip
                       formatter={(value: any) => formatCurrency(value)}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value: any, entry: any) => 
+                        `${entry.payload.name}: ${entry.payload.percentage.toFixed(1)}%`
+                      }
                     />
                   </PieChart>
                 </ResponsiveContainer>

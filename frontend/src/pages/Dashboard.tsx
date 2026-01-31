@@ -25,19 +25,19 @@ import { formatCurrency, formatPercentage } from "../utils/helpers";
 
 const TOOLTIPS = {
   totalWealth:
-    "Valore totale del tuo patrimonio calcolato dall'ultimo snapshot",
+    "Somma totale di tutti i tuoi asset (investimenti, liquidità, proprietà) al netto dei debiti",
   monthlyAvgSavings:
-    "Media mensile dei tuoi risparmi calcolata da inizio tracking",
+    "Importo medio che risparmi ogni mese dal primo snapshot a oggi",
   cagrTotal:
-    "Tasso di crescita annualizzato composto da inizio tracking (CAGR)",
-  cagrYoY: "Tasso di crescita annualizzato degli ultimi 12 mesi",
-  volatility: "Deviazione standard del tuo patrimonio nel tempo",
+    "Rendimento medio annualizzato del tuo patrimonio da quando hai iniziato il tracking",
+  cagrYoY: "Rendimento medio annualizzato degli ultimi 12 mesi",
+  volatility: "Variabilità del tuo patrimonio: valori alti indicano fluttuazioni importanti",
   volatilityAnnualized:
-    "Volatilità annualizzata calcolata sui rendimenti mensili",
-  maxDrawdown: "Massimo drawdown percentuale rispetto ai picchi storici",
+    "Volatilità annualizzata su base mensile: misura il rischio del tuo portafoglio",
+  maxDrawdown: "La perdita percentuale massima da un picco storico al drawdown più basso",
   runway:
-    "Numero di mesi di autonomia finanziaria al tasso di risparmio attuale",
-  runwayReal: "Autonomia finanziaria calcolata anche con risparmio negativo",
+    "Quanti mesi potrai mantenere il tuo stile di vita al tasso di risparmio attuale",
+  runwayReal: "Runway considerando anche scenari con risparmio negativo (spese > entrate)",
 };
 
 export default function Dashboard() {
@@ -187,6 +187,8 @@ export default function Dashboard() {
                           title={
                             TOOLTIPS[metric.tooltipKey as keyof typeof TOOLTIPS]
                           }
+                          placement="top"
+                          arrow
                         >
                           <IconButton size="small" sx={{ p: 0 }}>
                             <HelpOutline sx={{ fontSize: 16 }} />
