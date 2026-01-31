@@ -115,16 +115,20 @@ export default function Milestones() {
         field: "date",
         headerName: "Data",
         width: 140,
-        valueFormatter: (value) =>
-          value ? new Date(value).toLocaleDateString("it-IT") : "N/A",
+        valueFormatter: (params) => {
+          const value = params.value;
+          return value ? new Date(value).toLocaleDateString("it-IT") : "N/A";
+        },
       },
       { field: "title", headerName: "Titolo", flex: 1, minWidth: 180 },
       {
         field: "eventType",
         headerName: "Tipo",
         width: 160,
-        valueFormatter: (value) =>
-          EVENT_TYPES.find((t) => t.value === value)?.label || value,
+        valueFormatter: (params) => {
+          const value = params.value as string;
+          return EVENT_TYPES.find((t) => t.value === value)?.label || value;
+        },
       },
       {
         field: "description",

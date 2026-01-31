@@ -171,8 +171,10 @@ export default function Categories() {
         field: "categoryType",
         headerName: "Tipo",
         width: 160,
-        valueFormatter: (value) =>
-          CATEGORY_TYPES.find((t) => t.value === value)?.label || value,
+        valueFormatter: (params) => {
+          const value = params.value as string;
+          return CATEGORY_TYPES.find((t) => t.value === value)?.label || value;
+        },
       },
       {
         field: "sortOrder",

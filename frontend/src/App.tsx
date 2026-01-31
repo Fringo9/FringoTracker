@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Box } from "@mui/material";
 import { useAuthStore } from "./stores/authStore";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";

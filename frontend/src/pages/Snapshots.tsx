@@ -79,7 +79,8 @@ export default function Snapshots() {
           size="small"
         />
       ),
-      valueFormatter: (value) => {
+      valueFormatter: (params) => {
+        const value = params.value;
         if (!value) return "N/A";
         return new Date(value).toLocaleDateString("it-IT", {
           year: "numeric",
@@ -117,7 +118,8 @@ export default function Snapshots() {
       field: "createdAt",
       headerName: "Creato il",
       width: 180,
-      valueFormatter: (value) => {
+      valueFormatter: (params) => {
+        const value = params.value;
         if (!value) return "N/A";
         return new Date(value).toLocaleString("it-IT");
       },
@@ -187,20 +189,25 @@ export default function Snapshots() {
             onRowSelectionModelChange={(newSelection) => {
               setSelectedIds(newSelection as string[]);
             }}
-            onCellEditCommit={async (params) => {
-              const { id, field, value } = params;
+            processRowUpdate={async (newRow) => {
+              const id = newRow.id as string;
+              const oldRow = snapshots?.find((s: any) => s.id === id);
               const data: any = {};
-              if (field === "date") {
-                data.date = new Date(value as any).toISOString();
-              } else if (field === "totalValue") {
-                data.totalValue = Number(value);
-              } else if (field === "frequency") {
-                data.frequency = value;
+
+              if (oldRow?.date !== newRow.date) {
+                data.date = new Date(newRow.date).toISOString();
+              }
+              if (oldRow?.totalValue !== newRow.totalValue) {
+                data.totalValue = Number(newRow.totalValue);
+              }
+              if (oldRow?.frequency !== newRow.frequency) {
+                data.frequency = newRow.frequency;
               }
 
               if (Object.keys(data).length > 0) {
-                await updateMutation.mutateAsync({ id: String(id), data });
+                await updateMutation.mutateAsync({ id, data });
               }
+              return newRow;
             }}
             initialState={{
               pagination: { paginationModel: { pageSize: 25 } },
