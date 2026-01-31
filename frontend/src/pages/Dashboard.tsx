@@ -31,13 +31,16 @@ const TOOLTIPS = {
   cagrTotal:
     "Rendimento medio annualizzato del tuo patrimonio da quando hai iniziato il tracking",
   cagrYoY: "Rendimento medio annualizzato degli ultimi 12 mesi",
-  volatility: "Variabilità del tuo patrimonio: valori alti indicano fluttuazioni importanti",
+  volatility:
+    "Variabilità del tuo patrimonio: valori alti indicano fluttuazioni importanti",
   volatilityAnnualized:
     "Volatilità annualizzata su base mensile: misura il rischio del tuo portafoglio",
-  maxDrawdown: "La perdita percentuale massima da un picco storico al drawdown più basso",
+  maxDrawdown:
+    "La perdita percentuale massima da un picco storico al drawdown più basso",
   runway:
     "Quanti mesi potrai mantenere il tuo stile di vita al tasso di risparmio attuale",
-  runwayReal: "Runway considerando anche scenari con risparmio negativo (spese > entrate)",
+  runwayReal:
+    "Runway considerando anche scenari con risparmio negativo (spese > entrate)",
 };
 
 export default function Dashboard() {

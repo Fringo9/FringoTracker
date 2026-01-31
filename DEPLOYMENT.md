@@ -127,7 +127,7 @@ FIREBASE_SERVICE_ACCOUNT = [Incolla il JSON del service account]
 
 1. Render rileva commit su branch main
 2. Esegue automaticamente build e deploy
-3. ✅ Disponibile su: `https://fringotracker-backend.onrender.com`
+3. ✅ Disponibile su: `https://fringotracker.onrender.com`
 
 #### 📤 **Push generico (no frontend/backend)**:
 

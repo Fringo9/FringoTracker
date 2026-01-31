@@ -185,7 +185,7 @@ export default function Analytics() {
     Assets: "Asset",
     Liabilities: "Passività",
   };
-  
+
   const categoryData =
     analytics.categoryBreakdown?.map((cat: any) => ({
       name: categoryTypeLabels[cat.categoryType] || cat.categoryType,
@@ -324,7 +324,7 @@ export default function Analytics() {
                     <Legend
                       verticalAlign="bottom"
                       height={36}
-                      formatter={(value: any, entry: any) => 
+                      formatter={(value: any, entry: any) =>
                         `${entry.payload.name}: ${entry.payload.percentage.toFixed(1)}%`
                       }
                     />
