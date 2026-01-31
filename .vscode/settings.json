@@ -1,0 +1,8 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "/^cd \\.\\.; cd backend; npm install$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
+}

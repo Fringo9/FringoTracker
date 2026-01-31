@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: fringotracker-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FRONTEND_URL
+        value: https://YOUR_FIREBASE_HOSTING_DOMAIN
+      - key: JWT_SECRET
+        value: YOUR_JWT_SECRET
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false

@@ -1,0 +1,21 @@
+name: Notify Backend Deploy
+
+on:
+  push:
+    branches:
+      - main # Cambia in 'master' se usi master branch
+    paths:
+      - "backend/**"
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Trigger Render Deploy
+        run: |
+          echo "✅ Backend changes detected. Render will auto-deploy if configured."
+          echo "📦 Files changed in backend directory will trigger Render auto-deploy."
