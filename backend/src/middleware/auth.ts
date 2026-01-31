@@ -6,6 +6,11 @@ const JWT_SECRET =
 
 export interface AuthRequest extends Request {
   userId?: string;
+  headers: any;
+  body: any;
+  params: any;
+  file?: any;
+  files?: any;
 }
 
 export function authMiddleware(
