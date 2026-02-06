@@ -1,459 +1,550 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
-  Container,
-  Typography,
-  Paper,
   Button,
-  Stepper,
-  Step,
-  StepLabel,
-  Alert,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  LinearProgress,
+  Card,
+  CardActions,
+  CardContent,
   Chip,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
-import { Upload, CheckCircle, ErrorOutline } from "@mui/icons-material";
+import { Delete, Edit, Upload } from "@mui/icons-material";
 import { useDropzone } from "react-dropzone";
-import { read, utils } from "xlsx";
-import { PREDEFINED_CATEGORIES } from "../types";
+import * as XLSX from "xlsx";
 import api from "../services/api";
+import { useNavigate } from "react-router-dom";
+import { useCategories } from "../hooks/useCategories";
 
-interface ParsedData {
-  date: string;
-  categories: { [key: string]: number };
-  total: number;
+interface ImportEntry {
+  excelName: string;
+  itemName: string;
+  itemId: string;
+  category: string;
+  value: number;
 }
 
-const MONTH_MAP: { [key: string]: number } = {
-  gennaio: 0,
-  gen: 0,
-  febbraio: 1,
-  feb: 1,
-  marzo: 2,
-  mar: 2,
-  aprile: 3,
-  apr: 3,
-  maggio: 4,
-  mag: 4,
-  giugno: 5,
-  giu: 5,
-  luglio: 6,
-  lug: 6,
-  agosto: 7,
-  ago: 7,
-  settembre: 8,
-  set: 8,
-  ottobre: 9,
-  ott: 9,
-  novembre: 10,
-  nov: 10,
-  dicembre: 11,
-  dic: 11,
-};
+interface MappedSnapshot {
+  date: string;
+  entries: ImportEntry[];
+}
 
 export default function Import() {
-  const [activeStep, setActiveStep] = useState(0);
-  const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<ParsedData[]>([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [importResult, setImportResult] = useState<{
-    success: number;
-    failed: number;
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { categories: CATEGORIES } = useCategories();
+  const [mappedSnapshots, setMappedSnapshots] = useState<MappedSnapshot[]>([]);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<{
+    snapshotIdx: number;
+    entryIdx: number;
   } | null>(null);
+  const [editFormData, setEditFormData] = useState<ImportEntry | null>(null);
 
-  const { data: categoryDefinitions } = useQuery({
-    queryKey: ["category-definitions"],
+  const { data: items = [], isLoading: itemsLoading } = useQuery({
+    queryKey: ["items"],
     queryFn: async () => {
-      const response = await api.get("/category-definitions");
-      return response.data;
+      const response = await api.get("/items");
+      return response.data || [];
     },
   });
 
-  const steps = ["Carica File", "Preview Dati", "Conferma Import"];
+  const importMutation = useMutation({
+    mutationFn: async (snapshots: MappedSnapshot[]) => {
+      for (const snapshot of snapshots) {
+        await api.post("/snapshots", {
+          date: snapshot.date,
+          frequency: "monthly",
+          entries: snapshot.entries.map((e) => ({
+            itemId: e.itemId,
+            value: e.value,
+          })),
+          totalValue: snapshot.entries.reduce((sum, e) => sum + e.value, 0),
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["snapshots"] });
+      setMappedSnapshots([]);
+      navigate("/snapshots");
+    },
+  });
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      acceptedFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = e.target?.result;
+            if (typeof data === "string" || data instanceof ArrayBuffer) {
+              const workbook = XLSX.read(data, { type: "binary" });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const rows = XLSX.utils.sheet_to_json(worksheet);
+
+              const newSnapshots: MappedSnapshot[] = [];
+
+              (rows as any[]).forEach((row) => {
+                const date = row.Data || row.Date;
+                const excelName = row["Nome Voce"] || row["Item Name"] || "";
+                const value = parseFloat(row.Valore || row.Value || 0);
+
+                if (!date || !excelName || !value) return;
+
+                let snapshot = newSnapshots.find(
+                  (s) =>
+                    new Date(s.date).toDateString() ===
+                    new Date(date).toDateString(),
+                );
+
+                if (!snapshot) {
+                  snapshot = {
+                    date: new Date(date).toISOString().split("T")[0],
+                    entries: [],
+                  };
+                  newSnapshots.push(snapshot);
+                }
+
+                const matchedItem = items.find(
+                  (item: any) =>
+                    item.name.toLowerCase() === excelName.toLowerCase(),
+                );
+
+                snapshot.entries.push({
+                  excelName,
+                  itemName: matchedItem?.name || "",
+                  itemId: matchedItem?.id || "",
+                  category: matchedItem?.category || CATEGORIES[0],
+                  value,
+                });
+              });
+
+              setMappedSnapshots((prev) => [...prev, ...newSnapshots]);
+            }
+          } catch (error) {
+            console.error("Errore parsing file:", error);
+            alert("Errore nel parsing del file Excel");
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    },
+    [items],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
     accept: {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
         ".xlsx",
       ],
       "application/vnd.ms-excel": [".xls"],
     },
-    maxFiles: 1,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles.length > 0) {
-        setFile(acceptedFiles[0]);
-        parseExcel(acceptedFiles[0]);
-      }
-    },
   });
 
-  const parseExcel = async (file: File) => {
-    setLoading(true);
-    setError("");
+  const openEditDialog = (snapshotIdx: number, entryIdx: number) => {
+    setEditingEntry({ snapshotIdx, entryIdx });
+    setEditFormData({
+      ...mappedSnapshots[snapshotIdx].entries[entryIdx],
+    });
+    setEditDialogOpen(true);
+  };
 
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData: any[][] = utils.sheet_to_json(worksheet, {
-        header: 1,
-      });
+  const handleSaveEdit = () => {
+    if (!editingEntry || !editFormData) return;
 
-      // Trova la riga delle intestazioni (quella con i mesi o date)
-      let headerRowIndex = -1;
-      for (let i = 0; i < Math.min(5, jsonData.length); i++) {
-        const row = jsonData[i];
-        const hasMonth = row.some((cell: any) => {
-          // Check if it's a Date object (Excel converts "gen-24" to dates)
-          if (cell instanceof Date || typeof cell === "number") {
-            return true;
-          }
-          if (typeof cell !== "string") return false;
-          const lowerCell = cell.toLowerCase().trim();
-          // Check format "gen-24" or full month name
-          const match = lowerCell.match(/^([a-z]+)-(\d{2})$/);
-          if (match && match[1] in MONTH_MAP) return true;
-          return lowerCell in MONTH_MAP;
-        });
-        if (hasMonth) {
-          headerRowIndex = i;
-          break;
-        }
-      }
-
-      if (headerRowIndex === -1) {
-        throw new Error(
-          "Impossibile trovare la riga con i mesi nel file Excel",
-        );
-      }
-
-      const headers = jsonData[headerRowIndex] as any[];
-      const monthIndices: { month: number; col: number; year: number }[] = [];
-
-      // Identifica le colonne dei mesi (date o stringhe)
-      headers.forEach((header, index) => {
-        let dateObj: Date | null = null;
-
-        // Se è già un oggetto Date
-        if (header instanceof Date) {
-          dateObj = header;
-        }
-        // Se è un numero seriale Excel (giorni dal 1900-01-01)
-        else if (typeof header === "number") {
-          // Convert Excel serial number to Date
-          const excelEpoch = new Date(1900, 0, 1);
-          dateObj = new Date(
-            excelEpoch.getTime() + (header - 2) * 24 * 60 * 60 * 1000,
-          );
-        }
-        // Se è una stringa
-        else if (typeof header === "string") {
-          const lowerHeader = header.toLowerCase().trim();
-
-          // Check format "gen-24", "mar-24" etc
-          const match = lowerHeader.match(/^([a-z]+)-(\d{2})$/);
-          if (match) {
-            const [, monthAbbr, yearSuffix] = match;
-            if (monthAbbr in MONTH_MAP) {
-              const year = 2000 + parseInt(yearSuffix, 10);
-              const month = MONTH_MAP[monthAbbr];
-              monthIndices.push({ month, col: index, year });
+    const newSnapshots = mappedSnapshots.map((s, sIdx) => {
+      if (sIdx === editingEntry.snapshotIdx) {
+        return {
+          ...s,
+          entries: s.entries.map((e, eIdx) => {
+            if (eIdx === editingEntry.entryIdx) {
+              return editFormData;
             }
-          }
-          // Check full month name
-          else if (lowerHeader in MONTH_MAP) {
-            const month = MONTH_MAP[lowerHeader];
-            monthIndices.push({
-              month,
-              col: index,
-              year: new Date().getFullYear(),
-            });
-          }
-        }
-
-        // Se abbiamo una data, estraiamo mese e anno
-        if (dateObj && !isNaN(dateObj.getTime())) {
-          monthIndices.push({
-            month: dateObj.getMonth(),
-            col: index,
-            year: dateObj.getFullYear(),
-          });
-        }
-      });
-
-      if (monthIndices.length === 0) {
-        throw new Error("Nessun mese trovato nelle intestazioni");
+            return e;
+          }),
+        };
       }
+      return s;
+    });
 
-      // Estrai i dati per ogni mese
-      const parsed: ParsedData[] = [];
+    setMappedSnapshots(newSnapshots);
+    setEditDialogOpen(false);
+    setEditingEntry(null);
+    setEditFormData(null);
+  };
 
-      monthIndices.forEach(({ month, col, year }) => {
-        const categories: { [key: string]: number } = {};
-        let total = 0;
-
-        // Leggi tutte le righe dopo l'intestazione
-        for (
-          let rowIndex = headerRowIndex + 1;
-          rowIndex < jsonData.length;
-          rowIndex++
-        ) {
-          const row = jsonData[rowIndex];
-          const categoryName = row[0];
-
-          if (!categoryName || typeof categoryName !== "string") continue;
-          if (categoryName.toLowerCase() === "totale") {
-            total = parseFloat(String(row[col] || 0).replace(",", ".")) || 0;
-            break;
-          }
-
-          const value =
-            parseFloat(String(row[col] || 0).replace(",", ".")) || 0;
-          categories[categoryName.trim()] = value;
+  const handleDeleteEntry = (snapshotIdx: number, entryIdx: number) => {
+    const newSnapshots = mappedSnapshots
+      .map((s, sIdx) => {
+        if (sIdx === snapshotIdx) {
+          return {
+            ...s,
+            entries: s.entries.filter((_, eIdx) => eIdx !== entryIdx),
+          };
         }
+        return s;
+      })
+      .filter((s) => s.entries.length > 0);
 
-        parsed.push({
-          date: new Date(year, month, 1).toISOString(),
-          categories,
-          total,
-        });
-      });
-
-      setParsedData(parsed);
-      setActiveStep(1);
-    } catch (err: any) {
-      setError(err.message || "Errore durante il parsing del file");
-    } finally {
-      setLoading(false);
-    }
+    setMappedSnapshots(newSnapshots);
   };
 
-  const handleImport = async () => {
-    setLoading(true);
-    setError("");
-
-    let success = 0;
-    let failed = 0;
-
-    try {
-      for (const snapshot of parsedData) {
-        try {
-          // Mappa le categorie Excel alle categorie predefinite
-          const categorySource =
-            categoryDefinitions && categoryDefinitions.length > 0
-              ? categoryDefinitions
-              : PREDEFINED_CATEGORIES.map((cat) => ({
-                  name: cat.name,
-                  categoryType: cat.type,
-                  sortOrder: cat.sortOrder,
-                }));
-
-          const mappedCategories = categorySource.map((predefCat: any) => {
-            const excelValue = snapshot.categories[predefCat.name] ?? 0;
-            return {
-              name: predefCat.name,
-              categoryType: predefCat.categoryType || predefCat.type,
-              value: excelValue,
-              sortOrder: predefCat.sortOrder,
-            };
-          });
-
-          await api.post("/snapshots", {
-            date: snapshot.date,
-            frequency: "monthly",
-            totalValue: snapshot.total,
-            categories: mappedCategories,
-          });
-
-          success++;
-        } catch (err) {
-          console.error("Error importing snapshot:", err);
-          failed++;
-        }
-      }
-
-      setImportResult({ success, failed });
-      setActiveStep(2);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Errore durante l'import");
-    } finally {
-      setLoading(false);
-    }
+  const handleDeleteSnapshot = (snapshotIdx: number) => {
+    setMappedSnapshots((prev) => prev.filter((_, idx) => idx !== snapshotIdx));
   };
 
-  const renderStepContent = () => {
-    switch (activeStep) {
-      case 0:
-        return (
-          <Box>
-            <Paper
-              {...getRootProps()}
-              sx={{
-                p: 6,
-                textAlign: "center",
-                border: "2px dashed",
-                borderColor: isDragActive ? "primary.main" : "grey.300",
-                bgcolor: isDragActive ? "action.hover" : "transparent",
-                cursor: "pointer",
-                "&:hover": {
-                  borderColor: "primary.main",
-                  bgcolor: "action.hover",
-                },
-              }}
-            >
-              <input {...getInputProps()} />
-              <Upload sx={{ fontSize: 60, color: "primary.main", mb: 2 }} />
-              <Typography variant="h6" gutterBottom>
-                {isDragActive
-                  ? "Rilascia il file qui"
-                  : "Trascina il file Excel qui"}
-              </Typography>
-              <Typography color="text.secondary" mb={2}>
-                oppure clicca per selezionare
-              </Typography>
-              <Button variant="outlined">Seleziona File</Button>
-            </Paper>
-
-            {file && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                File selezionato: {file.name}
-              </Alert>
-            )}
-          </Box>
-        );
-
-      case 1:
-        return (
-          <Box>
-            <Alert severity="info" sx={{ mb: 3 }}>
-              Verranno importati {parsedData.length} snapshot mensili. Controlla
-              i dati prima di procedere.
-            </Alert>
-
-            <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Data</TableCell>
-                    <TableCell align="right">Totale</TableCell>
-                    <TableCell align="right">Categorie</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {parsedData.map((data, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        {new Date(data.date).toLocaleDateString("it-IT", {
-                          year: "numeric",
-                          month: "long",
-                        })}
-                      </TableCell>
-                      <TableCell align="right">
-                        {data.total.toLocaleString("it-IT", {
-                          style: "currency",
-                          currency: "EUR",
-                        })}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Chip
-                          label={`${Object.keys(data.categories).length} categorie`}
-                          size="small"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <Box sx={{ mt: 3, display: "flex", gap: 2 }}>
-              <Button onClick={() => setActiveStep(0)}>Indietro</Button>
-              <Button variant="contained" onClick={handleImport}>
-                Conferma Import
-              </Button>
-            </Box>
-          </Box>
-        );
-
-      case 2:
-        return (
-          <Box textAlign="center" py={4}>
-            {importResult && importResult.success > 0 ? (
-              <>
-                <CheckCircle
-                  sx={{ fontSize: 80, color: "success.main", mb: 2 }}
-                />
-                <Typography variant="h5" gutterBottom>
-                  Import Completato!
-                </Typography>
-                <Typography color="text.secondary" mb={3}>
-                  {importResult.success} snapshot importati con successo
-                  {importResult.failed > 0 &&
-                    ` (${importResult.failed} falliti)`}
-                </Typography>
-                <Button variant="contained" href="/snapshots">
-                  Visualizza Snapshot
-                </Button>
-              </>
-            ) : (
-              <>
-                <ErrorOutline
-                  sx={{ fontSize: 80, color: "error.main", mb: 2 }}
-                />
-                <Typography variant="h5" gutterBottom>
-                  Import Fallito
-                </Typography>
-                <Typography color="text.secondary" mb={3}>
-                  Nessun dato è stato importato
-                </Typography>
-                <Button variant="outlined" onClick={() => setActiveStep(0)}>
-                  Riprova
-                </Button>
-              </>
-            )}
-          </Box>
-        );
-
-      default:
-        return null;
-    }
-  };
+  if (itemsLoading) {
+    return (
+      <Container maxWidth="xl">
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
-    <Container maxWidth="lg">
+    <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Import Dati da Excel
+          Importa Snapshot
         </Typography>
-        <Typography color="text.secondary" mb={4}>
-          Importa i tuoi dati storici dal file Excel
+        <Typography color="text.secondary" mb={3}>
+          Importa i tuoi snapshot da un file Excel
         </Typography>
 
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
+        {/* Upload Area */}
+        <Card
+          {...getRootProps()}
+          variant="outlined"
+          sx={{
+            borderRadius: 3,
+            borderColor: isDragActive
+              ? "primary.main"
+              : "rgba(37, 99, 235, 0.12)",
+            backgroundColor: isDragActive ? "rgba(37, 99, 235, 0.04)" : "#fff",
+            p: 4,
+            textAlign: "center",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            "&:hover": {
+              borderColor: "primary.main",
+              backgroundColor: "rgba(37, 99, 235, 0.04)",
+            },
+            mb: 4,
+          }}
+        >
+          <input {...getInputProps()} />
+          <Upload sx={{ fontSize: 48, color: "primary.main", mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            {isDragActive
+              ? "Rilascia il file qui"
+              : "Trascina un file Excel qui o clicca per selezionare"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Formati supportati: .xlsx, .xls
+          </Typography>
+        </Card>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
+        {/* Mapped Snapshots */}
+        {mappedSnapshots.length > 0 && (
+          <Box>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
+            >
+              <Typography variant="h6">
+                Snapshot da importare ({mappedSnapshots.length})
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={() => importMutation.mutate(mappedSnapshots)}
+                disabled={importMutation.isPending}
+              >
+                {importMutation.isPending ? "Importazione..." : "Importa Tutto"}
+              </Button>
+            </Box>
+
+            <Stack spacing={2}>
+              {mappedSnapshots.map((snapshot, snapshotIdx) => (
+                <Card
+                  key={snapshotIdx}
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 3,
+                    borderColor: "rgba(37, 99, 235, 0.12)",
+                  }}
+                >
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Typography variant="h6">
+                        {new Date(snapshot.date).toLocaleDateString("it-IT")}
+                      </Typography>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteSnapshot(snapshotIdx)}
+                      >
+                        Elimina Snapshot
+                      </Button>
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Stack spacing={1.5} divider={<Divider flexItem />}>
+                      {snapshot.entries.map((entry, entryIdx) => (
+                        <Card
+                          key={entryIdx}
+                          variant="outlined"
+                          sx={{
+                            borderRadius: 3,
+                            borderColor: !entry.itemId
+                              ? "rgba(245, 158, 11, 0.4)"
+                              : "rgba(37, 99, 235, 0.12)",
+                            backgroundColor: !entry.itemId
+                              ? "rgba(245, 158, 11, 0.08)"
+                              : "#fff",
+                          }}
+                        >
+                          <CardContent sx={{ pb: 1.5 }}>
+                            <Stack spacing={1.5}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 2,
+                                }}
+                              >
+                                <Box>
+                                  <Typography variant="subtitle1" noWrap>
+                                    {entry.excelName}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    Voce app: {entry.itemName || "Non mappata"}
+                                  </Typography>
+                                </Box>
+                                {!entry.itemId && (
+                                  <Chip
+                                    label="Da mappare"
+                                    color="warning"
+                                    size="small"
+                                    variant="outlined"
+                                  />
+                                )}
+                              </Box>
+
+                              <Stack
+                                direction={{ xs: "column", md: "row" }}
+                                spacing={2}
+                                alignItems={{ xs: "stretch", md: "center" }}
+                              >
+                                <FormControl
+                                  size="small"
+                                  sx={{ minWidth: 180 }}
+                                >
+                                  <InputLabel>Categoria</InputLabel>
+                                  <Select
+                                    label="Categoria"
+                                    value={entry.category}
+                                    onChange={(e) => {
+                                      const newCategory = e.target.value;
+                                      const newSnapshots = mappedSnapshots.map(
+                                        (s, sIdx) => {
+                                          if (sIdx === snapshotIdx) {
+                                            return {
+                                              ...s,
+                                              entries: s.entries.map(
+                                                (en, eIdx) => {
+                                                  if (eIdx === entryIdx) {
+                                                    return {
+                                                      ...en,
+                                                      category: newCategory,
+                                                    };
+                                                  }
+                                                  return en;
+                                                },
+                                              ),
+                                            };
+                                          }
+                                          return s;
+                                        },
+                                      );
+                                      setMappedSnapshots(newSnapshots);
+                                    }}
+                                  >
+                                    {CATEGORIES.map((category) => (
+                                      <MenuItem key={category} value={category}>
+                                        {category}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+
+                                <Box sx={{ flexGrow: 1 }} />
+                                <Typography
+                                  variant="h6"
+                                  sx={{ fontWeight: 700 }}
+                                >
+                                  {entry.value.toLocaleString("it-IT", {
+                                    style: "currency",
+                                    currency: "EUR",
+                                  })}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                          </CardContent>
+                          <CardActions sx={{ px: 2, pb: 2, pt: 0, gap: 0.5 }}>
+                            <Button
+                              size="small"
+                              startIcon={<Edit fontSize="small" />}
+                              onClick={() =>
+                                openEditDialog(snapshotIdx, entryIdx)
+                              }
+                            >
+                              Modifica
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              startIcon={<Delete fontSize="small" />}
+                              onClick={() =>
+                                handleDeleteEntry(snapshotIdx, entryIdx)
+                              }
+                            >
+                              Elimina
+                            </Button>
+                          </CardActions>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        {mappedSnapshots.length === 0 && (
+          <Alert severity="info">
+            Carica un file Excel per visualizzare gli snapshot da importare
           </Alert>
         )}
 
-        {loading && <LinearProgress sx={{ mb: 3 }} />}
-
-        {renderStepContent()}
+        {/* Edit Dialog */}
+        <Dialog
+          open={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setEditingEntry(null);
+            setEditFormData(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Modifica Voce</DialogTitle>
+          <DialogContent
+            sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 2 }}
+          >
+            <TextField
+              label="Nome Excel"
+              value={editFormData?.excelName || ""}
+              onChange={(e) =>
+                setEditFormData((prev) =>
+                  prev ? { ...prev, excelName: e.target.value } : null,
+                )
+              }
+              fullWidth
+              disabled
+            />
+            <TextField
+              label="Nome Voce"
+              value={editFormData?.itemName || ""}
+              onChange={(e) =>
+                setEditFormData((prev) =>
+                  prev ? { ...prev, itemName: e.target.value } : null,
+                )
+              }
+              fullWidth
+            />
+            <FormControl fullWidth>
+              <InputLabel>Categoria</InputLabel>
+              <Select
+                label="Categoria"
+                value={editFormData?.category || ""}
+                onChange={(e) =>
+                  setEditFormData((prev) =>
+                    prev ? { ...prev, category: e.target.value } : null,
+                  )
+                }
+              >
+                {CATEGORIES.map((category) => (
+                  <MenuItem key={category} value={category}>
+                    {category}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Valore"
+              type="number"
+              value={editFormData?.value || ""}
+              onChange={(e) =>
+                setEditFormData((prev) =>
+                  prev
+                    ? { ...prev, value: parseFloat(e.target.value) || 0 }
+                    : null,
+                )
+              }
+              fullWidth
+              inputProps={{ step: "0.01" }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditingEntry(null);
+                setEditFormData(null);
+              }}
+            >
+              Annulla
+            </Button>
+            <Button variant="contained" onClick={handleSaveEdit}>
+              Salva
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Container>
   );

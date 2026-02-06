@@ -1,35 +1,42 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Button,
-  IconButton,
-  CircularProgress,
   Alert,
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
   Chip,
+  CircularProgress,
+  Container,
+  IconButton,
+  Pagination,
+  Stack,
   TextField,
+  Typography,
+  InputAdornment,
 } from "@mui/material";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
-import { Add, Delete } from "@mui/icons-material";
+import { Add, Delete, Edit, Search, TrendingUp } from "@mui/icons-material";
 import api from "../services/api";
 import { formatCurrency } from "../utils/helpers";
 
+const PAGE_SIZE = 9;
+
 export default function Snapshots() {
   const queryClient = useQueryClient();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const {
-    data: snapshots,
+    data: snapshots = [],
     isLoading,
     error,
   } = useQuery({
     queryKey: ["snapshots"],
     queryFn: async () => {
       const response = await api.get("/snapshots");
-      return response.data;
+      return response.data || [];
     },
   });
 
@@ -40,16 +47,7 @@ export default function Snapshots() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["snapshots"] });
       queryClient.invalidateQueries({ queryKey: ["analytics"] });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (payload: { id: string; data: any }) => {
-      await api.put(`/snapshots/${payload.id}`, payload.data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["snapshots"] });
-      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["snapshot"] });
     },
   });
 
@@ -59,88 +57,45 @@ export default function Snapshots() {
     }
   };
 
-  const columns: GridColDef[] = [
-    {
-      field: "date",
-      headerName: "Data",
-      width: 150,
-      editable: true,
-      renderEditCell: (params) => (
-        <TextField
-          type="date"
-          value={params.value ? String(params.value).slice(0, 10) : ""}
-          onChange={(event) =>
-            params.api.setEditCellValue({
-              id: params.id,
-              field: params.field,
-              value: event.target.value,
-            })
-          }
-          size="small"
-        />
-      ),
-      valueFormatter: (params) => {
-        const value = params.value;
-        if (!value) return "N/A";
-        return new Date(value).toLocaleDateString("it-IT", {
-          year: "numeric",
-          month: "long",
-        });
-      },
-    },
-    {
-      field: "frequency",
-      headerName: "Frequenza",
-      width: 130,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: [
-        { value: "monthly", label: "Mensile" },
-        { value: "weekly", label: "Settimanale" },
-      ],
-      renderCell: (params) => (
-        <Chip
-          label={params.value === "monthly" ? "Mensile" : "Settimanale"}
-          size="small"
-          color={params.value === "monthly" ? "primary" : "secondary"}
-        />
-      ),
-    },
-    {
-      field: "totalValue",
-      headerName: "Valore Totale",
-      width: 180,
-      editable: true,
-      valueFormatter: (value) =>
-        typeof value === "number" ? formatCurrency(value) : "N/A",
-    },
-    {
-      field: "createdAt",
-      headerName: "Creato il",
-      width: 180,
-      valueFormatter: (params) => {
-        const value = params.value;
-        if (!value) return "N/A";
-        return new Date(value).toLocaleString("it-IT");
-      },
-    },
-    {
-      field: "actions",
-      headerName: "Azioni",
-      width: 100,
-      sortable: false,
-      renderCell: (params) => (
-        <IconButton
-          size="small"
-          color="error"
-          onClick={() => handleDelete(params.row.id)}
-          disabled={deleteMutation.isPending}
-        >
-          <Delete />
-        </IconButton>
-      ),
-    },
-  ];
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return snapshots;
+
+    return snapshots.filter((snapshot: any) => {
+      const dateLabel = snapshot.date
+        ? new Date(snapshot.date).toLocaleDateString("it-IT", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })
+        : "";
+      const frequencyLabel =
+        snapshot.frequency === "monthly" ? "Mensile" : "Settimanale";
+      const totalLabel = formatCurrency(snapshot.totalValue || 0);
+
+      return [
+        dateLabel,
+        frequencyLabel,
+        totalLabel,
+        String(snapshot.totalValue || 0),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [snapshots, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pagedSnapshots = filtered.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(1);
+    }
+  }, [page, totalPages]);
 
   if (isLoading) {
     return (
@@ -165,7 +120,13 @@ export default function Snapshots() {
   return (
     <Container maxWidth="xl">
       <Box sx={{ py: 4 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          alignItems={{ xs: "flex-start", md: "center" }}
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ mb: 3 }}
+        >
           <Box>
             <Typography variant="h4" gutterBottom>
               Snapshot Patrimonio
@@ -174,54 +135,180 @@ export default function Snapshots() {
               Gestisci tutti i tuoi snapshot mensili e settimanali
             </Typography>
           </Box>
-          <Button variant="contained" startIcon={<Add />} href="/import">
-            Nuovo Snapshot
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            href="/manual-snapshot"
+          >
+            Nuova Snapshot
           </Button>
-        </Box>
+        </Stack>
 
-        <Paper sx={{ height: 600, width: "100%" }}>
-          <DataGrid
-            rows={snapshots || []}
-            columns={columns}
-            pageSizeOptions={[10, 25, 50]}
-            checkboxSelection
-            disableRowSelectionOnClick
-            onRowSelectionModelChange={(newSelection) => {
-              setSelectedIds(newSelection as string[]);
-            }}
-            processRowUpdate={async (newRow) => {
-              const id = newRow.id as string;
-              const oldRow = snapshots?.find((s: any) => s.id === id);
-              const data: any = {};
-
-              if (oldRow?.date !== newRow.date) {
-                data.date = new Date(newRow.date).toISOString();
-              }
-              if (oldRow?.totalValue !== newRow.totalValue) {
-                data.totalValue = Number(newRow.totalValue);
-              }
-              if (oldRow?.frequency !== newRow.frequency) {
-                data.frequency = newRow.frequency;
-              }
-
-              if (Object.keys(data).length > 0) {
-                await updateMutation.mutateAsync({ id, data });
-              }
-              return newRow;
-            }}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 25 } },
-              sorting: {
-                sortModel: [{ field: "date", sort: "desc" }],
-              },
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={3}>
+          <TextField
+            placeholder="Cerca per data, frequenza o importo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
             }}
           />
-        </Paper>
+          <Chip
+            label={`${filtered.length} snapshot`}
+            color="primary"
+            variant="outlined"
+            sx={{ alignSelf: "center" }}
+          />
+        </Stack>
 
-        {selectedIds.length > 0 && (
-          <Alert severity="info" sx={{ mt: 2 }}>
-            {selectedIds.length} snapshot selezionati
+        {filtered.length === 0 ? (
+          <Alert severity="info">
+            Nessuno snapshot trovato. Crea una nuova snapshot per iniziare.
           </Alert>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gap: 2,
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(2, 1fr)",
+                lg: "repeat(3, 1fr)",
+              },
+            }}
+          >
+            {pagedSnapshots.map((snapshot: any) => {
+              const dateLabel = snapshot.date
+                ? new Date(snapshot.date).toLocaleDateString("it-IT", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "N/A";
+              const createdLabel = snapshot.createdAt
+                ? new Date(snapshot.createdAt).toLocaleString("it-IT")
+                : "N/A";
+              const frequencyLabel =
+                snapshot.frequency === "monthly" ? "Mensile" : "Settimanale";
+
+              return (
+                <Card
+                  key={snapshot.id}
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 3,
+                    borderColor: "rgba(37, 99, 235, 0.12)",
+                    background:
+                      "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                  }}
+                >
+                  <CardContent>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
+                        mb: 2,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "info.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <TrendingUp />
+                      </Box>
+                      <Box sx={{ width: "100%" }}>
+                        <Typography
+                          variant="h6"
+                          noWrap
+                          component="div"
+                          sx={{ fontWeight: 700, mb: 0.5 }}
+                        >
+                          {dateLabel}
+                        </Typography>
+                        <Typography
+                          variant="h5"
+                          sx={{ fontWeight: 700, mb: 0.5 }}
+                        >
+                          {formatCurrency(snapshot.totalValue || 0)}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 2 }}
+                        >
+                          Valore totale del patrimonio
+                        </Typography>
+                        <Chip
+                          label={frequencyLabel}
+                          color={
+                            snapshot.frequency === "monthly"
+                              ? "primary"
+                              : "secondary"
+                          }
+                          variant="outlined"
+                          size="small"
+                        />
+                      </Box>
+                    </Box>
+                  </CardContent>
+                  <CardActions
+                    sx={{
+                      px: 2,
+                      pb: 2,
+                      pt: 0,
+                      gap: 1,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      startIcon={<Edit />}
+                      href={`/manual-snapshot/${snapshot.id}`}
+                    >
+                      Modifica
+                    </Button>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(snapshot.id)}
+                      disabled={deleteMutation.isPending}
+                      title="Elimina snapshot"
+                    >
+                      <Delete />
+                    </IconButton>
+                  </CardActions>
+                </Card>
+              );
+            })}
+          </Box>
+        )}
+
+        {filtered.length > PAGE_SIZE && (
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(_, value) => setPage(value)}
+              color="primary"
+              shape="rounded"
+            />
+          </Box>
         )}
       </Box>
     </Container>

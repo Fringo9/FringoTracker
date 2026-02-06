@@ -1,14 +1,23 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import api from "../services/api";
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: { email: string } | null;
+  user: { email: string; displayName?: string; photoURL?: string } | null;
   token: string | null;
   encryptionKey: CryptoKey | null;
-  login: (email: string, password: string, token: string) => Promise<void>;
+  login: (
+    email: string,
+    password: string,
+    token: string,
+    displayName?: string,
+    photoURL?: string,
+  ) => Promise<void>;
   logout: () => void;
   setEncryptionKey: (key: CryptoKey) => void;
+  rederiveEncryptionKey: (password: string) => Promise<void>;
+  updateProfile: (displayName: string, photoURL: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -18,12 +27,22 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       encryptionKey: null,
-      login: async (email: string, password: string, token: string) => {
+      login: async (
+        email: string,
+        password: string,
+        token: string,
+        displayName?: string,
+        photoURL?: string,
+      ) => {
         // Deriva chiave di encryption dalla password
         const key = await deriveEncryptionKey(password, email);
         set({
           isAuthenticated: true,
-          user: { email },
+          user: {
+            email,
+            displayName: displayName || "",
+            photoURL: photoURL || "",
+          },
           token,
           encryptionKey: key,
         });
@@ -38,6 +57,30 @@ export const useAuthStore = create<AuthState>()(
       },
       setEncryptionKey: (key: CryptoKey) => {
         set({ encryptionKey: key });
+      },
+      rederiveEncryptionKey: async (password: string) => {
+        const state = useAuthStore.getState();
+        if (!state.user?.email) {
+          throw new Error("No user email available for key derivation");
+        }
+        const key = await deriveEncryptionKey(password, state.user.email);
+        set({ encryptionKey: key });
+      },
+      updateProfile: async (displayName: string, photoURL: string) => {
+        const response = await api.put("/auth/profile", {
+          displayName,
+          photoURL,
+        });
+        const data = response.data;
+        set((state) => ({
+          user: state.user
+            ? {
+                ...state.user,
+                displayName: data.displayName,
+                photoURL: data.photoURL,
+              }
+            : null,
+        }));
       },
     }),
     {

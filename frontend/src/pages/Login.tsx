@@ -20,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -33,12 +34,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await api.post("/auth/login", { email, password });
-      const { token } = response.data;
+      const endpoint = isRegistering ? "/auth/register" : "/auth/login";
+      const response = await api.post(endpoint, { email, password });
+      const { token, user } = response.data;
 
-      await login(email, password, token);
+      await login(email, password, token, user?.displayName, user?.photoURL);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Errore durante il login");
+      const action = isRegistering ? "registrazione" : "login";
+      setError(err.response?.data?.message || `Errore durante il ${action}`);
     } finally {
       setLoading(false);
     }
@@ -77,81 +80,111 @@ export default function Login() {
   };
 
   return (
-    <Container maxWidth="sm">
+    <>
       <Box
         sx={{
           minHeight: "100vh",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          background:
+            "radial-gradient(circle at top, rgba(37,99,235,0.18), transparent 45%), linear-gradient(180deg, #f1f7ff 0%, #f8fbff 60%, #ffffff 100%)",
+          px: 2,
         }}
       >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            width: "100%",
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="h4" component="h1" gutterBottom align="center">
-            Wealth Tracker
-          </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            align="center"
-            mb={3}
+        <Container maxWidth="sm">
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 3, sm: 4 },
+              width: "100%",
+              borderRadius: 4,
+              border: "1px solid rgba(37, 99, 235, 0.12)",
+              boxShadow: "0 20px 40px rgba(37, 99, 235, 0.15)",
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(6px)",
+            }}
           >
-            Gestione Patrimonio Personale
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              margin="normal"
-              required
-              autoFocus
-            />
-            <TextField
-              fullWidth
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              margin="normal"
-              required
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{ mt: 3 }}
+            <Typography variant="h4" component="h1" gutterBottom align="center">
+              Wealth Tracker
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              align="center"
+              mb={3}
             >
-              {loading ? "Accesso..." : "Accedi"}
-            </Button>
-            <Button
-              fullWidth
-              variant="text"
-              sx={{ mt: 1 }}
-              onClick={() => setResetOpen(true)}
-            >
-              Password dimenticata?
-            </Button>
-          </form>
-        </Paper>
+              Gestione Patrimonio Personale
+            </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                margin="normal"
+                required
+                autoFocus
+              />
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                margin="normal"
+                required
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                size="large"
+                disabled={loading}
+                sx={{ mt: 3, py: 1.2 }}
+              >
+                {loading
+                  ? isRegistering
+                    ? "Registrazione..."
+                    : "Accesso..."
+                  : isRegistering
+                    ? "Registrati"
+                    : "Accedi"}
+              </Button>
+              <Button
+                fullWidth
+                variant="text"
+                sx={{ mt: 1 }}
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setError("");
+                }}
+              >
+                {isRegistering
+                  ? "Hai già un account? Accedi"
+                  : "Non hai un account? Registrati"}
+              </Button>
+              {!isRegistering && (
+                <Button
+                  fullWidth
+                  variant="text"
+                  sx={{ mt: 1 }}
+                  onClick={() => setResetOpen(true)}
+                >
+                  Password dimenticata?
+                </Button>
+              )}
+            </form>
+          </Paper>
+        </Container>
       </Box>
 
       <Dialog open={resetOpen} onClose={() => setResetOpen(false)}>
@@ -187,6 +220,6 @@ export default function Login() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+    </>
   );
 }

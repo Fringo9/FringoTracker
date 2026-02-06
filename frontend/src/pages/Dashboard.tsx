@@ -19,28 +19,34 @@ import {
   ShowChart,
   CalendarMonth,
   HelpOutline,
+  SwapVert,
+  TrendingFlat,
+  Balance,
 } from "@mui/icons-material";
 import api from "../services/api";
 import { formatCurrency, formatPercentage } from "../utils/helpers";
 
 const TOOLTIPS = {
   totalWealth:
-    "Somma totale di tutti i tuoi asset (investimenti, liquidità, proprietà) al netto dei debiti",
+    "Il valore complessivo di tutti i tuoi beni (conti bancari, investimenti, immobili, contanti) meno i debiti. Rappresenta la tua situazione patrimoniale netta attuale.",
   monthlyAvgSavings:
-    "Importo medio che risparmi ogni mese dal primo snapshot a oggi",
+    "La differenza media di patrimonio mese su mese, calcolata dal primo al più recente snapshot. Un valore positivo indica che stai accumulando ricchezza.",
   cagrTotal:
-    "Rendimento medio annualizzato del tuo patrimonio da quando hai iniziato il tracking",
-  cagrYoY: "Rendimento medio annualizzato degli ultimi 12 mesi",
-  volatility:
-    "Variabilità del tuo patrimonio: valori alti indicano fluttuazioni importanti",
+    "Tasso di crescita annuo composto (CAGR) del tuo patrimonio dall'inizio del tracking. Permette di confrontare la tua crescita con benchmark come l'inflazione.",
+  cagrYoY:
+    "Tasso di crescita annuo composto calcolato sugli ultimi 12 mesi. Utile per capire se il trend recente è migliorato o peggiorato rispetto alla media storica.",
   volatilityAnnualized:
-    "Volatilità annualizzata su base mensile: misura il rischio del tuo portafoglio",
+    "Misura quanto i rendimenti mensili del tuo patrimonio variano nel corso dell'anno. Una volatilità alta indica oscillazioni significative; una bassa indica stabilità.",
   maxDrawdown:
-    "La perdita percentuale massima da un picco storico al drawdown più basso",
+    "La perdita percentuale massima subita dal punto più alto al punto più basso del patrimonio. Indica il peggior scenario storico che hai attraversato.",
   runway:
-    "Quanti mesi potrai mantenere il tuo stile di vita al tasso di risparmio attuale",
-  runwayReal:
-    "Runway considerando anche scenari con risparmio negativo (spese > entrate)",
+    "Il numero di mesi durante i quali potresti mantenere il tuo stile di vita attuale usando solo il patrimonio, al ritmo di risparmio medio corrente.",
+  absoluteChange:
+    "La variazione in euro del tuo patrimonio dal primo snapshot registrato ad oggi. Mostra quanto hai guadagnato o perso in termini assoluti.",
+  lastMonthChange:
+    "La variazione del patrimonio nell'ultimo mese, sia in euro che in percentuale. Ti dice se il mese più recente è stato positivo o negativo.",
+  debtRatio:
+    "Il rapporto tra i tuoi debiti (Debito + Finanziamento) e il patrimonio totale. Un valore sotto il 30% è generalmente considerato sano per le finanze personali.",
 };
 
 export default function Dashboard() {
@@ -54,14 +60,16 @@ export default function Dashboard() {
       const response = await api.get("/analytics");
       return response.data;
     },
+    staleTime: 60_000,
   });
 
-  const { data: snapshots } = useQuery({
-    queryKey: ["snapshots"],
+  const { data: snapshotSummary } = useQuery({
+    queryKey: ["snapshotsSummary"],
     queryFn: async () => {
-      const response = await api.get("/snapshots");
+      const response = await api.get("/snapshots/summary");
       return response.data;
     },
+    staleTime: 60_000,
   });
 
   if (isLoading) {
@@ -87,66 +95,75 @@ export default function Dashboard() {
   const metrics = [
     {
       title: "Patrimonio Totale",
-      value: formatCurrency(analytics?.totalWealth || 0),
+      value: formatCurrency(analytics?.totalWealth ?? 0),
       icon: <AccountBalance />,
       color: "primary.main",
       tooltipKey: "totalWealth",
     },
     {
       title: "Risparmio Medio Mensile",
-      value: formatCurrency(analytics?.monthlyAvgSavings || 0),
+      value: formatCurrency(analytics?.monthlyAvgSavings ?? 0),
       icon: <Savings />,
       color: "success.main",
       tooltipKey: "monthlyAvgSavings",
     },
     {
+      title: "Variazione Assoluta",
+      value: formatCurrency(analytics?.absoluteChange ?? 0),
+      icon: <SwapVert />,
+      color:
+        (analytics?.absoluteChange ?? 0) >= 0 ? "success.main" : "error.main",
+      tooltipKey: "absoluteChange",
+    },
+    {
+      title: "Variazione Ultimo Mese",
+      value: `${formatCurrency(analytics?.lastMonthChange ?? 0)} (${formatPercentage(analytics?.lastMonthChangePercent ?? 0)})`,
+      icon: <TrendingFlat />,
+      color:
+        (analytics?.lastMonthChange ?? 0) >= 0 ? "success.main" : "error.main",
+      tooltipKey: "lastMonthChange",
+    },
+    {
       title: "CAGR Totale",
-      value: formatPercentage(analytics?.cagrTotal || 0),
+      value: formatPercentage(analytics?.cagrTotal ?? 0),
       icon: <TrendingUp />,
       color: "info.main",
       tooltipKey: "cagrTotal",
     },
     {
       title: "CAGR Ultimo Anno",
-      value: formatPercentage(analytics?.cagrYoY || 0),
+      value: formatPercentage(analytics?.cagrYoY ?? 0),
       icon: <ShowChart />,
       color: "secondary.main",
       tooltipKey: "cagrYoY",
     },
     {
-      title: "Volatilità",
-      value: formatCurrency(analytics?.volatility || 0),
-      icon: <Timeline />,
-      color: "warning.main",
-      tooltipKey: "volatility",
-    },
-    {
       title: "Volatilità Annualizzata",
-      value: formatPercentage(analytics?.volatilityAnnualized || 0),
+      value: formatPercentage(analytics?.volatilityAnnualized ?? 0),
       icon: <Timeline />,
       color: "warning.main",
       tooltipKey: "volatilityAnnualized",
     },
     {
       title: "Max Drawdown",
-      value: formatPercentage(analytics?.maxDrawdown || 0),
+      value: formatPercentage(analytics?.maxDrawdown ?? 0),
       icon: <ShowChart />,
       color: "error.main",
       tooltipKey: "maxDrawdown",
     },
     {
       title: "Runway (Mesi)",
-      value: Math.round(analytics?.runway || 0),
+      value: Math.round(analytics?.runway ?? 0),
       icon: <CalendarMonth />,
-      color: "error.main",
+      color: "warning.main",
       tooltipKey: "runway",
     },
     {
-      title: "Runway Reale (Mesi)",
-      value: Math.round(analytics?.runwayReal || 0),
-      icon: <CalendarMonth />,
-      color: "error.main",
-      tooltipKey: "runwayReal",
+      title: "Rapporto Debito/Patrimonio",
+      value: formatPercentage(analytics?.debtRatio ?? 0),
+      icon: <Balance />,
+      color: (analytics?.debtRatio ?? 0) > 30 ? "error.main" : "success.main",
+      tooltipKey: "debtRatio",
     },
   ];
 
@@ -163,25 +180,49 @@ export default function Dashboard() {
         <Grid container spacing={3}>
           {metrics.map((metric, index) => (
             <Grid item xs={12} sm={6} md={4} key={index}>
-              <Card>
+              <Card
+                variant="outlined"
+                sx={{
+                  borderRadius: 3,
+                  borderColor: "rgba(37, 99, 235, 0.12)",
+                  background:
+                    "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                }}
+              >
                 <CardContent>
                   <Box
-                    sx={{ display: "flex", alignItems: "flex-start", mb: 2 }}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      textAlign: "center",
+                      mb: 2,
+                    }}
                   >
                     <Box
                       sx={{
-                        p: 1,
-                        borderRadius: 2,
-                        bgcolor: `${metric.color}15`,
+                        p: 1.5,
+                        borderRadius: 3,
+                        bgcolor: `${metric.color}20`,
                         color: metric.color,
-                        mr: 2,
+                        mb: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "56px",
                       }}
                     >
                       {metric.icon}
                     </Box>
-                    <Box sx={{ flex: 1 }}>
+                    <Box sx={{ width: "100%" }}>
                       <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 1,
+                          mb: 1,
+                        }}
                       >
                         <Typography variant="body2" color="text.secondary">
                           {metric.title}
@@ -198,9 +239,11 @@ export default function Dashboard() {
                           </IconButton>
                         </Tooltip>
                       </Box>
+                      <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                        {metric.value}
+                      </Typography>
                     </Box>
                   </Box>
-                  <Typography variant="h4">{metric.value}</Typography>
                 </CardContent>
               </Card>
             </Grid>
@@ -213,7 +256,15 @@ export default function Dashboard() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Card>
+              <Card
+                variant="outlined"
+                sx={{
+                  borderRadius: 3,
+                  borderColor: "rgba(37, 99, 235, 0.12)",
+                  background:
+                    "linear-gradient(135deg, rgba(14,165,233,0.12) 0%, rgba(255,255,255,1) 55%)",
+                }}
+              >
                 <CardContent>
                   <Typography
                     variant="subtitle2"
@@ -222,12 +273,22 @@ export default function Dashboard() {
                   >
                     Snapshot Totali
                   </Typography>
-                  <Typography variant="h5">{snapshots?.length || 0}</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {snapshotSummary?.count ?? 0}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Card>
+              <Card
+                variant="outlined"
+                sx={{
+                  borderRadius: 3,
+                  borderColor: "rgba(37, 99, 235, 0.12)",
+                  background:
+                    "linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(255,255,255,1) 55%)",
+                }}
+              >
                 <CardContent>
                   <Typography
                     variant="subtitle2"
@@ -236,9 +297,11 @@ export default function Dashboard() {
                   >
                     Ultimo Aggiornamento
                   </Typography>
-                  <Typography variant="h6">
-                    {snapshots?.[0]?.date
-                      ? new Date(snapshots[0].date).toLocaleDateString("it-IT")
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    {snapshotSummary?.lastDate
+                      ? new Date(snapshotSummary.lastDate).toLocaleDateString(
+                          "it-IT",
+                        )
                       : "N/A"}
                   </Typography>
                 </CardContent>
