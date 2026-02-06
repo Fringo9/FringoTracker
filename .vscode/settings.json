@@ -3,6 +3,14 @@
     "/^cd \\.\\.; cd backend; npm install$/": {
       "approve": true,
       "matchCommandLine": true
+    },
+    "/^npm list \"@mui/x-data-grid\"$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^netstat -ano \\| findstr \"5000\\\\\\|3001\" \\| Select-Object -First 5$/": {
+      "approve": true,
+      "matchCommandLine": true
     }
   }
 }
