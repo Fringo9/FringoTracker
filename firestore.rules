@@ -23,8 +23,29 @@ service cloud.firestore {
       allow update: if isOwner(resource.data.userId);
     }
     
+    // Snapshot Entries collection
+    match /snapshotEntries/{entryId} {
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId);
+    }
+    
+    // Items collection
+    match /items/{itemId} {
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId);
+    }
+    
     // Categories collection
     match /categories/{categoryId} {
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId);
+    }
+    
+    // Category Definitions collection
+    match /categoryDefinitions/{defId} {
       allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId);
@@ -35,6 +56,11 @@ service cloud.firestore {
       allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isOwner(resource.data.userId);
+    }
+    
+    // Snapshot Templates collection (doc ID = userId)
+    match /snapshotTemplates/{templateId} {
+      allow read, write: if isAuthenticated() && templateId == request.auth.uid;
     }
   }
 }

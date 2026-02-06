@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { authMiddleware, AuthRequest } from "../middleware/auth.js";
 import { firestore } from "../services/firebase.js";
+import {
+  validateBody,
+  createMilestoneSchema,
+  updateMilestoneSchema,
+} from "../validators/schemas.js";
 
 const router = Router();
 
@@ -42,68 +47,80 @@ router.get("/", authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Create milestone
-router.post("/", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.userId!;
-    const { date, title, description, eventType, icon } = req.body;
+router.post(
+  "/",
+  authMiddleware,
+  validateBody(createMilestoneSchema),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { date, title, description, eventType, icon } = req.body;
 
-    const milestoneData: any = {
-      userId,
-      date: new Date(date),
-      title,
-      description,
-      eventType,
-      icon: icon || null,
-      createdAt: new Date(),
-    };
+      const milestoneData: any = {
+        userId,
+        date: new Date(date),
+        title,
+        description,
+        eventType,
+        icon: icon || null,
+        createdAt: new Date(),
+      };
 
-    const milestoneRef = await firestore
-      .collection("milestones")
-      .add(milestoneData);
+      const milestoneRef = await firestore
+        .collection("milestones")
+        .add(milestoneData);
 
-    res.status(201).json({ id: milestoneRef.id, message: "Milestone created" });
-  } catch (error) {
-    console.error("Create milestone error:", error);
-    res.status(500).json({ error: "Failed to create milestone" });
-  }
-});
+      res
+        .status(201)
+        .json({ id: milestoneRef.id, message: "Milestone created" });
+    } catch (error) {
+      console.error("Create milestone error:", error);
+      res.status(500).json({ error: "Failed to create milestone" });
+    }
+  },
+);
 
 // Update milestone
-router.put("/:id", authMiddleware, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.userId!;
-    const milestoneId = req.params.id;
-    const { date, title, description, eventType, icon } = req.body;
+router.put(
+  "/:id",
+  authMiddleware,
+  validateBody(updateMilestoneSchema),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const milestoneId = req.params.id;
+      const { date, title, description, eventType, icon } = req.body;
 
-    const milestoneDoc = await firestore
-      .collection("milestones")
-      .doc(milestoneId)
-      .get();
+      const milestoneDoc = await firestore
+        .collection("milestones")
+        .doc(milestoneId)
+        .get();
 
-    if (!milestoneDoc.exists || milestoneDoc.data()?.userId !== userId) {
-      return res.status(404).json({ error: "Milestone not found" });
+      if (!milestoneDoc.exists || milestoneDoc.data()?.userId !== userId) {
+        return res.status(404).json({ error: "Milestone not found" });
+      }
+
+      const updateData: any = {
+        date: date ? new Date(date) : milestoneDoc.data()?.date,
+        title,
+        description,
+        eventType,
+        icon: icon || null,
+        updatedAt: new Date(),
+      };
+
+      await firestore
+        .collection("milestones")
+        .doc(milestoneId)
+        .update(updateData);
+
+      res.json({ message: "Milestone updated" });
+    } catch (error) {
+      console.error("Update milestone error:", error);
+      res.status(500).json({ error: "Failed to update milestone" });
     }
-
-    const updateData: any = {
-      date: date ? new Date(date) : milestoneDoc.data()?.date,
-      title,
-      description,
-      eventType,
-      icon: icon || null,
-      updatedAt: new Date(),
-    };
-
-    await firestore
-      .collection("milestones")
-      .doc(milestoneId)
-      .update(updateData);
-
-    res.json({ message: "Milestone updated" });
-  } catch (error) {
-    console.error("Update milestone error:", error);
-    res.status(500).json({ error: "Failed to update milestone" });
-  }
-});
+  },
+);
 
 // Delete milestone
 router.delete("/:id", authMiddleware, async (req: AuthRequest, res) => {

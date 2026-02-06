@@ -4,19 +4,24 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { firestore } from "../services/firebase.js";
 import { authMiddleware, AuthRequest } from "../middleware/auth.js";
+import {
+  validateBody,
+  loginSchema,
+  registerSchema,
+  changePasswordSchema,
+  requestResetSchema,
+  resetPasswordSchema,
+  updateProfileSchema,
+} from "../validators/schemas.js";
 
 const router = Router();
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 // Login
-router.post("/login", async (req, res) => {
+router.post("/login", validateBody(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
-    }
 
     // Get user from Firestore
     const usersRef = firestore.collection("users");
@@ -40,7 +45,15 @@ router.post("/login", async (req, res) => {
       expiresIn: "30d",
     });
 
-    res.json({ token, user: { id: userDoc.id, email: user.email } });
+    res.json({
+      token,
+      user: {
+        id: userDoc.id,
+        email: user.email,
+        displayName: user.displayName || "",
+        photoURL: user.photoURL || "",
+      },
+    });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
@@ -48,13 +61,9 @@ router.post("/login", async (req, res) => {
 });
 
 // Register (for initial setup only)
-router.post("/register", async (req, res) => {
+router.post("/register", validateBody(registerSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
-    }
 
     // Check if user exists
     const usersRef = firestore.collection("users");
@@ -79,7 +88,10 @@ router.post("/register", async (req, res) => {
       expiresIn: "30d",
     });
 
-    res.status(201).json({ token, user: { id: userRef.id, email } });
+    res.status(201).json({
+      token,
+      user: { id: userRef.id, email, displayName: "", photoURL: "" },
+    });
   } catch (error) {
     console.error("Register error:", error);
     res.status(500).json({ error: "Registration failed" });
@@ -90,16 +102,11 @@ router.post("/register", async (req, res) => {
 router.post(
   "/change-password",
   authMiddleware,
+  validateBody(changePasswordSchema),
   async (req: AuthRequest, res) => {
     try {
       const userId = req.userId!;
       const { currentPassword, newPassword } = req.body;
-
-      if (!currentPassword || !newPassword) {
-        return res
-          .status(400)
-          .json({ error: "Current and new password required" });
-      }
 
       const userDoc = await firestore.collection("users").doc(userId).get();
       if (!userDoc.exists) {
@@ -127,94 +134,124 @@ router.post(
 );
 
 // Request password reset (returns token for now)
-router.post("/request-reset", async (req, res) => {
-  try {
-    const { email } = req.body;
+router.post(
+  "/request-reset",
+  validateBody(requestResetSchema),
+  async (req, res) => {
+    try {
+      const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ error: "Email required" });
+      const usersRef = firestore.collection("users");
+      const snapshot = await usersRef
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return res.json({
+          message: "If the user exists, a token was generated",
+        });
+      }
+
+      const userDoc = snapshot.docs[0];
+      const token = crypto.randomBytes(24).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      await firestore.collection("passwordResets").add({
+        userId: userDoc.id,
+        token,
+        createdAt: new Date(),
+        expiresAt,
+        usedAt: null,
+      });
+
+      res.json({ message: "Reset token generated", token });
+    } catch (error) {
+      console.error("Request reset error:", error);
+      res.status(500).json({ error: "Failed to request password reset" });
     }
-
-    const usersRef = firestore.collection("users");
-    const snapshot = await usersRef.where("email", "==", email).limit(1).get();
-
-    if (snapshot.empty) {
-      return res.json({ message: "If the user exists, a token was generated" });
-    }
-
-    const userDoc = snapshot.docs[0];
-    const token = crypto.randomBytes(24).toString("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-    await firestore.collection("passwordResets").add({
-      userId: userDoc.id,
-      token,
-      createdAt: new Date(),
-      expiresAt,
-      usedAt: null,
-    });
-
-    res.json({ message: "Reset token generated", token });
-  } catch (error) {
-    console.error("Request reset error:", error);
-    res.status(500).json({ error: "Failed to request password reset" });
-  }
-});
+  },
+);
 
 // Reset password using token
-router.post("/reset-password", async (req, res) => {
-  try {
-    const { email, token, newPassword } = req.body;
+router.post(
+  "/reset-password",
+  validateBody(resetPasswordSchema),
+  async (req, res) => {
+    try {
+      const { email, token, newPassword } = req.body;
 
-    if (!email || !token || !newPassword) {
-      return res
-        .status(400)
-        .json({ error: "Email, token and password required" });
+      const usersRef = firestore.collection("users");
+      const snapshot = await usersRef
+        .where("email", "==", email)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userDoc = snapshot.docs[0];
+
+      const resetSnapshot = await firestore
+        .collection("passwordResets")
+        .where("userId", "==", userDoc.id)
+        .where("token", "==", token)
+        .where("usedAt", "==", null)
+        .get();
+
+      if (resetSnapshot.empty) {
+        return res.status(400).json({ error: "Invalid reset token" });
+      }
+
+      const resetDoc = resetSnapshot.docs[0];
+      const resetData = resetDoc.data();
+
+      if (
+        resetData.expiresAt?.toDate &&
+        resetData.expiresAt.toDate() < new Date()
+      ) {
+        return res.status(400).json({ error: "Reset token expired" });
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await firestore.collection("users").doc(userDoc.id).update({
+        passwordHash,
+        updatedAt: new Date(),
+      });
+
+      await resetDoc.ref.update({ usedAt: new Date() });
+
+      res.json({ message: "Password reset successful" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
+  },
+);
 
-    const usersRef = firestore.collection("users");
-    const snapshot = await usersRef.where("email", "==", email).limit(1).get();
+// Update profile (authenticated)
+router.put(
+  "/profile",
+  authMiddleware,
+  validateBody(updateProfileSchema),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { displayName, photoURL } = req.body;
 
-    if (snapshot.empty) {
-      return res.status(404).json({ error: "User not found" });
+      await firestore.collection("users").doc(userId).update({
+        displayName,
+        photoURL,
+        updatedAt: new Date(),
+      });
+
+      res.json({ displayName, photoURL });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
-
-    const userDoc = snapshot.docs[0];
-
-    const resetSnapshot = await firestore
-      .collection("passwordResets")
-      .where("userId", "==", userDoc.id)
-      .where("token", "==", token)
-      .where("usedAt", "==", null)
-      .get();
-
-    if (resetSnapshot.empty) {
-      return res.status(400).json({ error: "Invalid reset token" });
-    }
-
-    const resetDoc = resetSnapshot.docs[0];
-    const resetData = resetDoc.data();
-
-    if (
-      resetData.expiresAt?.toDate &&
-      resetData.expiresAt.toDate() < new Date()
-    ) {
-      return res.status(400).json({ error: "Reset token expired" });
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await firestore.collection("users").doc(userDoc.id).update({
-      passwordHash,
-      updatedAt: new Date(),
-    });
-
-    await resetDoc.ref.update({ usedAt: new Date() });
-
-    res.json({ message: "Password reset successful" });
-  } catch (error) {
-    console.error("Reset password error:", error);
-    res.status(500).json({ error: "Failed to reset password" });
-  }
-});
+  },
+);
 
 export default router;

@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error(
+    "FATAL: JWT_SECRET environment variable is required. Server cannot start without it.",
+  );
+}
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -26,7 +30,7 @@ export function authMiddleware(
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const decoded = jwt.verify(token, JWT_SECRET!) as { userId: string };
 
     req.userId = decoded.userId;
     next();
