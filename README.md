@@ -2,63 +2,124 @@
 
 **Personal Wealth Management & Analytics Dashboard**
 
-Applicazione full-stack per tracciare l'evoluzione del patrimonio personale nel tempo, con analytics avanzate, gestione categorie, milestones e proiezioni finanziarie.
+Applicazione full-stack per tracciare l'evoluzione del patrimonio personale nel tempo, con analytics avanzate, gestione categorie, milestones, proiezioni finanziarie, dark mode e crittografia client-side.
 
-![Tech Stack](https://img.shields.io/badge/React-18-blue)
+![React](https://img.shields.io/badge/React-18-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-22-green)
 ![Firebase](https://img.shields.io/badge/Firebase-Firestore-orange)
+![MUI](https://img.shields.io/badge/MUI-5-purple)
+![Vitest](https://img.shields.io/badge/Tests-50%20passing-brightgreen)
 
 ---
 
-## 🚀 Features
+## 🚀 Funzionalità
 
 ### 📊 Dashboard
 
-- **9 metriche chiave** con tooltip esplicativi
-- Snapshot del patrimonio totale e variazioni
-- CAGR (Compound Annual Growth Rate)
-- Saving rate e risparmio mensile
-- Volatilità annualizzata, Max Drawdown, Runway Real
+- **Patrimonio totale** con variazione assoluta e percentuale
+- **Risparmio medio mensile** calcolato automaticamente
+- **Variazione ultimo mese** con indicatore colore (verde/rosso)
+- **CAGR totale** e **CAGR ultimo anno** (tasso di crescita annuo composto)
+- **Volatilità annualizzata** dei rendimenti mensili
+- **Max Drawdown** — perdita massima dal picco al minimo storico
+- **Runway** — mesi di autonomia finanziaria
+- **Rapporto Debito/Patrimonio** con soglia 30%
+- Tooltip informativi in italiano su ogni metrica
 
 ### 📈 Analytics
 
-- Timeline interattiva con grafici Recharts
-- Filtri temporali (6M/12M/24M/All)
-- Confronto Year-over-Year (YoY)
-- Milestones markers sul grafico
-- Export dati (CSV) e grafici (SVG)
+- **Timeline patrimonio** — LineChart interattivo con filtri temporali (6M / 12M / 24M / All)
+- **Export CSV e SVG** del grafico timeline
+- **Milestone sul grafico** — linee di riferimento tratteggiate per eventi importanti
+- **Pie Chart categorie** — distribuzione percentuale per categoria, cliccabile
+- **Storico per categoria** — AreaChart dedicato visibile cliccando una fetta del pie chart
+- **Proiezioni future (12 mesi)** — scenari Ottimistico, Realistico, Pessimistico
+- **Heatmap variazioni mensili** — griglia anno × mese con colori verde/rosso e tooltip dettagliati
+- **Confronto Year-over-Year** — patrimonio attuale vs 12 mesi fa
+- **9 card metriche di crescita** con icone e descrizioni
 
-### 💾 Snapshots
+### 📸 Snapshot Patrimonio
 
-- Tracciamento patrimonio con date personalizzate
-- Gestione categorie per snapshot (Investimenti, Liquidità, Debiti, ecc.)
-- **Inline editing** su DataGrid per modifiche rapide
-- Calcolo automatico del totale
+- Lista snapshot con ricerca, paginazione (9/pagina) e conteggio filtrato
+- Creazione e modifica snapshot manuale con voci dinamiche
+- Autocomplete voci con template preconfigurato
+- Creazione nuova voce inline durante l'inserimento
+- Cambio categoria inline con salvataggio debounced
+- Calcolo totale in tempo reale
+- Validazione righe incomplete
+- Eliminazione con conferma modale
 
-### 🎯 Milestones
+### 🏆 Milestone
 
-- Tracciamento eventi finanziari importanti
-- Tipi: Lavoro, Investimento, Acquisto, Altro
-- Visualizzazione markers su timeline Analytics
+- Tracciamento eventi finanziari importanti (cambio lavoro, acquisto, investimento, debito estinto, altro)
+- Creazione/modifica via dialog modale
+- Visualizzazione come ReferenceLine sulla timeline Analytics
+- Ordinamento per data
 
-### 🏷️ Categorie
+### 📥 Import Excel
 
-- Definizione categorie personalizzate (Assets/Liabilities)
-- Riordinamento drag-and-drop
-- Seed automatico con 21 categorie predefinite
+- Drag & Drop con supporto .xlsx / .xls
+- Parsing automatico colonne (Data, Nome Voce, Valore)
+- Mapping automatico voci Excel ↔ Item database (case-insensitive)
+- Indicazione voci non mappate con chip arancione
+- Modifica/eliminazione entry prima dell'import
+- Import batch multiplo con redirect automatico
 
-### 📥 Import
+### ⚙️ Impostazioni
 
-- Caricamento massivo dati via Excel/CSV
-- Template automatico basato su categorie utente
-- Validazione e preview prima dell'import
+- **Gestione Voci** — CRUD completo con protezione cascade (non eliminabili se usate in snapshot)
+- **Gestione Categorie** — aggiunta, eliminazione con protezione (non eliminabili se usate da voci), seeding automatico
+- **Template Snapshot** — configurazione voci precaricate per ogni nuova snapshot, riordinamento e salvataggio esplicito
 
-### 🔐 Autenticazione
+### 👤 Profilo
 
-- Registrazione e login con JWT
-- Cambio password da Settings
-- Password reset via token email
+- Modifica nome utente e foto profilo (upload immagine, max 2MB, Base64)
+- Anteprima avatar con fallback a iniziale
+- Cambio password con validazione
+
+### 🔐 Autenticazione & Sicurezza
+
+- Login/Registrazione con form unificato
+- JWT con scadenza 30 giorni
+- Password hashing (bcrypt, 10 salt rounds)
+- Reset password a 2 step (token con scadenza 1h)
+- Crittografia client-side AES-256-GCM (chiave derivata da PBKDF2, 100k iterazioni)
+- ReauthModal per ri-derivare la chiave dopo page reload
+- Auto-logout su 401
+- Validazione input Zod su tutti gli endpoint
+- Ownership verification su ogni query Firestore
+- Cascade protection su eliminazione Item e Categorie
+
+### 🛡️ Sicurezza Backend
+
+- **Helmet** — headers HTTP di sicurezza
+- **CORS** — origini consentite configurabili
+- **Rate Limiting** — 100 req/min globale, 10 req/min su auth (anti brute-force)
+- **Error handler centralizzato** — stack trace solo in sviluppo
+
+### ⚡ Performance
+
+- **Analytics Cache** — cache in-memory per utente con TTL 5 minuti e invalidazione automatica
+- **Batch Firestore queries** — 1 query anziché N×M, risoluzione in-memoria
+- **Batch writes** — operazioni Firestore in batch (limite 499)
+- **React Query** — caching client-side con staleTime configurato (60s–300s)
+
+### 🌙 Dark Mode
+
+- Toggle Light/Dark nella sidebar con persistenza su localStorage
+- Tema MUI completo con palette, ombre e hover personalizzati per entrambe le modalità
+
+### 🎨 UI/UX
+
+- Material UI design system con Recharts
+- Font Inter
+- Sidebar collassabile (240px ↔ 60px) + drawer mobile responsive
+- Navigazione gerarchica con sezioni espandibili
+- Avatar utente nell'header con dropdown Logout
+- Card design con gradient, bordi arrotondati (16px), ombre dinamiche
+- Formattazione locale italiana (date, valute €, percentuali)
+- ErrorBoundary per gestione errori runtime
 
 ---
 
@@ -67,19 +128,28 @@ Applicazione full-stack per tracciare l'evoluzione del patrimonio personale nel 
 ### Frontend
 
 - **React 18** + **TypeScript**
-- **Material-UI (MUI)** per UI components
-- **TanStack React Query** per state management e caching
-- **Recharts** per data visualization
-- **Vite** come build tool
+- **Material-UI (MUI 5)** per UI components
+- **TanStack React Query 5** per state management e caching
+- **Zustand 4** per stato globale (auth, theme) con persist middleware
+- **Recharts** per data visualization (Line, Area, Pie charts)
+- **Axios** per HTTP client con interceptor auth
+- **Vite 5** come build tool
 
 ### Backend
 
-- **Node.js 22** + **Express**
-- **TypeScript**
+- **Node.js 22** + **Express** + **TypeScript**
 - **Firebase Admin SDK** (Firestore NoSQL database)
 - **JWT** per autenticazione
+- **Zod** per validazione input
+- **bcrypt** per password hashing
+- **Helmet** + **express-rate-limit** per sicurezza
 - **Multer** per file upload
 - **XLSX** per Excel parsing
+
+### Testing
+
+- **Vitest** — 50 test totali (47 backend + 3 frontend)
+- Schema validation, analytics cache, ErrorBoundary
 
 ### Deployment
 
@@ -144,23 +214,37 @@ Consulta [DEPLOYMENT.md](DEPLOYMENT.md) per la guida completa al deployment auto
 
 ```
 FringoTracker/
-├── frontend/              # React app
+├── frontend/                  # React app
+│   ├── public/               # Favicon, assets statici
 │   ├── src/
-│   │   ├── pages/        # Dashboard, Analytics, Snapshots, etc.
-│   │   ├── components/   # Layout, shared components
-│   │   ├── types/        # TypeScript interfaces
-│   │   └── App.tsx
+│   │   ├── pages/            # Dashboard, Analytics, Snapshots, ManualSnapshot,
+│   │   │                       Milestones, Import, Settings, Profile, Login
+│   │   ├── components/       # Layout, ErrorBoundary, ReauthModal
+│   │   ├── hooks/            # useCategories
+│   │   ├── stores/           # authStore, themeStore (Zustand)
+│   │   ├── services/         # api (Axios), firebase
+│   │   ├── types/            # TypeScript interfaces
+│   │   ├── utils/            # helpers (formatCurrency, etc.)
+│   │   ├── test/             # setup test
+│   │   ├── theme.ts          # MUI theme (light/dark)
+│   │   ├── App.tsx           # Router
+│   │   └── main.tsx          # Entry point
 │   └── package.json
-├── backend/              # Express API
+├── backend/                  # Express API
 │   ├── src/
-│   │   ├── routes/       # API endpoints
-│   │   ├── middleware/   # Auth, error handling
-│   │   └── index.ts
+│   │   ├── routes/           # analytics, auth, categoryDefinitions, import,
+│   │   │                       items, milestones, snapshots, snapshotTemplate
+│   │   ├── middleware/       # auth (JWT), errorHandler
+│   │   ├── services/         # firebase, analyticsCache
+│   │   ├── validators/       # Zod schemas + middleware
+│   │   └── index.ts          # Server entry
+│   ├── vitest.config.ts
 │   └── package.json
-├── .github/
-│   └── workflows/        # GitHub Actions CI/CD
-├── firebase.json         # Firebase Hosting config
-├── render.yaml           # Render.com config
+├── .github/workflows/        # GitHub Actions CI/CD
+├── firebase.json             # Firebase Hosting config
+├── firestore.rules           # Security rules
+├── firestore.indexes.json    # Firestore indexes
+├── render.yaml               # Render.com config
 └── README.md
 ```
 
@@ -190,23 +274,25 @@ VITE_API_URL=http://localhost:5000
 
 ### Collections
 
-- **users**: Utenti registrati (email, password hash)
-- **snapshots**: Snapshot patrimonio (date, totalValue, userId)
-- **categories**: Dettaglio categorie per snapshot (name, value, snapshotId)
-- **milestones**: Eventi finanziari (title, date, eventType, userId)
-- **categoryDefinitions**: Definizioni categorie personalizzate (name, type, sortOrder, userId)
-- **passwordResets**: Token temporanei per reset password (expiresAt)
+- **users** — Utenti registrati (email, password hash, displayName, photoURL)
+- **snapshots** — Snapshot patrimonio (date, totalValue, frequency, userId)
+- **snapshotEntries** — Dettaglio voci per snapshot (itemId, value, snapshotId)
+- **items** — Voci patrimoniali (name, category, sortOrder, userId)
+- **milestones** — Eventi finanziari (title, date, description, eventType, userId)
+- **categoryDefinitions** — Categorie personalizzate (name, categoryType, sortOrder, userId)
+- **snapshotTemplates** — Template voci preconfigurate per snapshot (items[], userId)
+- **passwordResets** — Token temporanei per reset password (token, email, expiresAt)
 
 ---
 
 ## 🧪 Testing
 
 ```powershell
-# Backend tests (se implementati)
+# Backend tests (47 test — Zod schemas + analytics cache)
 cd backend
 npm test
 
-# Frontend tests (se implementati)
+# Frontend tests (3 test — ErrorBoundary)
 cd frontend
 npm test
 ```
@@ -231,9 +317,9 @@ Questo progetto è privato. Tutti i diritti riservati.
 
 ## 👤 Author
 
-**Il tuo nome**
+**Fringo9**
 
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
+- GitHub: [@Fringo9](https://github.com/Fringo9)
 
 ---
 

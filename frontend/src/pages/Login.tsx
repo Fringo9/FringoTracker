@@ -106,7 +106,7 @@ export default function Login() {
             }}
           >
             <Typography variant="h4" component="h1" gutterBottom align="center">
-              Wealth Tracker
+              Fringo Tracker
             </Typography>
             <Typography
               variant="body2"
