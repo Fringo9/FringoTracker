@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import api from "../services/api";
+import { queryClient } from "../queryClient";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -34,6 +35,9 @@ export const useAuthStore = create<AuthState>()(
         displayName?: string,
         photoURL?: string,
       ) => {
+        // Clear previous user's cached data
+        queryClient.clear();
+
         // Deriva chiave di encryption dalla password
         const key = await deriveEncryptionKey(password, email);
         set({
@@ -48,6 +52,9 @@ export const useAuthStore = create<AuthState>()(
         });
       },
       logout: () => {
+        // Clear all cached query data
+        queryClient.clear();
+
         set({
           isAuthenticated: false,
           user: null,
