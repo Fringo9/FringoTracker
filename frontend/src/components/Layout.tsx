@@ -351,6 +351,19 @@ export default function Layout({ children }: LayoutProps) {
           >
             {isObscured ? <VisibilityOffIcon /> : <VisibilityIcon />}
           </IconButton>
+          {user?.email === "demo@fringotracker.it" && (
+            <Chip
+              label="DEMO"
+              size="small"
+              sx={{
+                mr: 1,
+                fontWeight: 700,
+                letterSpacing: 1,
+                bgcolor: "warning.main",
+                color: "warning.contrastText",
+              }}
+            />
+          )}
           <Chip
             avatar={
               <Avatar

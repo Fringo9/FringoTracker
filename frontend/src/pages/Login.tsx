@@ -2,7 +2,9 @@ import { useState } from "react";
 import {
   Box,
   Button,
+  CircularProgress,
   Container,
+  Divider,
   IconButton,
   Paper,
   TextField,
@@ -35,6 +37,7 @@ export default function Login() {
   const login = useAuthStore((state) => state.login);
   const themeMode = useThemeStore((state) => state.mode);
   const toggleMode = useThemeStore((state) => state.toggleMode);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +87,26 @@ export default function Login() {
       setResetStatus(
         err.response?.data?.error || "Errore durante il reset password",
       );
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setError("");
+    setDemoLoading(true);
+    try {
+      const response = await api.post("/auth/demo-login");
+      const { token, user } = response.data;
+      await login(
+        "demo@fringotracker.it",
+        "DemoFringo2026!",
+        token,
+        user?.displayName,
+        user?.photoURL,
+      );
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Errore durante l'accesso demo");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -224,6 +247,37 @@ export default function Login() {
                 </Button>
               )}
             </form>
+
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="caption" color="text.secondary">
+                oppure
+              </Typography>
+            </Divider>
+
+            <Button
+              fullWidth
+              variant="outlined"
+              size="large"
+              disabled={demoLoading || loading}
+              onClick={handleDemoLogin}
+              sx={{ py: 1.2 }}
+              startIcon={
+                demoLoading ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : undefined
+              }
+            >
+              {demoLoading ? "Preparazione demo..." : "🚀 Prova Demo"}
+            </Button>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              align="center"
+              display="block"
+              mt={1}
+            >
+              Esplora l'app con dati di esempio, senza registrarti
+            </Typography>
           </Paper>
         </Container>
       </Box>

@@ -13,6 +13,8 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
 } from "../validators/schemas.js";
+import { setupDemoAccount } from "../services/demoSeed.js";
+import { invalidateAnalyticsCache } from "../services/analyticsCache.js";
 
 const router = Router();
 const JWT_SECRET =
@@ -57,6 +59,34 @@ router.post("/login", validateBody(loginSchema), async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Login failed" });
+  }
+});
+
+// Demo Login — creates/resets demo account with fake data
+router.post("/demo-login", async (req, res) => {
+  try {
+    const { userId } = await setupDemoAccount();
+
+    // Invalidate analytics cache for demo user
+    invalidateAnalyticsCache(userId);
+
+    // Generate JWT
+    const token = jwt.sign({ userId }, JWT_SECRET, {
+      expiresIn: "30d",
+    });
+
+    res.json({
+      token,
+      user: {
+        id: userId,
+        email: "demo@fringotracker.it",
+        displayName: "Utente Demo",
+        photoURL: "",
+      },
+    });
+  } catch (error) {
+    console.error("Demo login error:", error);
+    res.status(500).json({ error: "Demo login failed" });
   }
 });
 
