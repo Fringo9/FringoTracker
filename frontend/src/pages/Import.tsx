@@ -238,7 +238,9 @@ export default function Import() {
             borderColor: isDragActive
               ? "primary.main"
               : "rgba(37, 99, 235, 0.12)",
-            backgroundColor: isDragActive ? "rgba(37, 99, 235, 0.04)" : "#fff",
+            backgroundColor: isDragActive
+              ? "rgba(37, 99, 235, 0.04)"
+              : undefined,
             p: 4,
             textAlign: "center",
             cursor: "pointer",
@@ -330,7 +332,7 @@ export default function Import() {
                               : "rgba(37, 99, 235, 0.12)",
                             backgroundColor: !entry.itemId
                               ? "rgba(245, 158, 11, 0.08)"
-                              : "#fff",
+                              : undefined,
                           }}
                         >
                           <CardContent sx={{ pb: 1.5 }}>

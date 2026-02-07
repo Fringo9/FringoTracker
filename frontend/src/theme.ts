@@ -95,8 +95,11 @@ export function getTheme(mode: "light" | "dark") {
               ? "0 10px 30px rgba(37, 99, 235, 0.08)"
               : "0 10px 30px rgba(0, 0, 0, 0.3)",
             border: isLight
-              ? "1px solid rgba(37, 99, 235, 0.08)"
+              ? "1px solid rgba(37, 99, 235, 0.12)"
               : "1px solid rgba(255, 255, 255, 0.08)",
+            background: isLight
+              ? "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)"
+              : "linear-gradient(180deg, rgba(37,99,235,0.08) 0%, rgba(30,41,59,1) 60%)",
             transition: "transform 0.2s ease, box-shadow 0.2s ease",
             "&:hover": {
               transform: "translateY(-2px)",

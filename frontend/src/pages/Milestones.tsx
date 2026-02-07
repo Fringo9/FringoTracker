@@ -194,16 +194,7 @@ export default function Milestones() {
                 : "N/A";
 
               return (
-                <Card
-                  key={milestone.id}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 3,
-                    borderColor: "rgba(37, 99, 235, 0.12)",
-                    background:
-                      "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
-                  }}
-                >
+                <Card key={milestone.id} variant="outlined">
                   <CardContent>
                     <Box
                       sx={{
@@ -302,8 +293,6 @@ export default function Milestones() {
           PaperProps={{
             sx: {
               borderRadius: 3,
-              backgroundColor: "white",
-              border: "1px solid rgba(37, 99, 235, 0.12)",
             },
           }}
         >

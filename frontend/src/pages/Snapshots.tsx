@@ -20,6 +20,7 @@ import {
 import { Add, Delete, Edit, Search, TrendingUp } from "@mui/icons-material";
 import api from "../services/api";
 import { formatCurrency } from "../utils/helpers";
+import { usePrivacyStore } from "../stores/privacyStore";
 
 const PAGE_SIZE = 9;
 
@@ -27,6 +28,7 @@ export default function Snapshots() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const isObscured = usePrivacyStore((state) => state.isObscured);
 
   const {
     data: snapshots = [],
@@ -197,16 +199,7 @@ export default function Snapshots() {
                 snapshot.frequency === "monthly" ? "Mensile" : "Settimanale";
 
               return (
-                <Card
-                  key={snapshot.id}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 3,
-                    borderColor: "rgba(37, 99, 235, 0.12)",
-                    background:
-                      "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
-                  }}
-                >
+                <Card key={snapshot.id} variant="outlined">
                   <CardContent>
                     <Box
                       sx={{
@@ -245,7 +238,7 @@ export default function Snapshots() {
                           variant="h5"
                           sx={{ fontWeight: 700, mb: 0.5 }}
                         >
-                          {formatCurrency(snapshot.totalValue || 0)}
+                          {formatCurrency(snapshot.totalValue || 0, isObscured)}
                         </Typography>
                         <Typography
                           variant="body2"

@@ -25,6 +25,7 @@ import {
 } from "@mui/icons-material";
 import api from "../services/api";
 import { formatCurrency, formatPercentage } from "../utils/helpers";
+import { usePrivacyStore } from "../stores/privacyStore";
 
 const TOOLTIPS = {
   totalWealth:
@@ -50,6 +51,8 @@ const TOOLTIPS = {
 };
 
 export default function Dashboard() {
+  const isObscured = usePrivacyStore((state) => state.isObscured);
+
   const {
     data: analytics,
     isLoading,
@@ -95,21 +98,21 @@ export default function Dashboard() {
   const metrics = [
     {
       title: "Patrimonio Totale",
-      value: formatCurrency(analytics?.totalWealth ?? 0),
+      value: formatCurrency(analytics?.totalWealth ?? 0, isObscured),
       icon: <AccountBalance />,
       color: "primary.main",
       tooltipKey: "totalWealth",
     },
     {
       title: "Risparmio Medio Mensile",
-      value: formatCurrency(analytics?.monthlyAvgSavings ?? 0),
+      value: formatCurrency(analytics?.monthlyAvgSavings ?? 0, isObscured),
       icon: <Savings />,
       color: "success.main",
       tooltipKey: "monthlyAvgSavings",
     },
     {
       title: "Variazione Assoluta",
-      value: formatCurrency(analytics?.absoluteChange ?? 0),
+      value: formatCurrency(analytics?.absoluteChange ?? 0, isObscured),
       icon: <SwapVert />,
       color:
         (analytics?.absoluteChange ?? 0) >= 0 ? "success.main" : "error.main",
@@ -117,7 +120,7 @@ export default function Dashboard() {
     },
     {
       title: "Variazione Ultimo Mese",
-      value: `${formatCurrency(analytics?.lastMonthChange ?? 0)} (${formatPercentage(analytics?.lastMonthChangePercent ?? 0)})`,
+      value: `${formatCurrency(analytics?.lastMonthChange ?? 0, isObscured)} (${formatPercentage(analytics?.lastMonthChangePercent ?? 0)})`,
       icon: <TrendingFlat />,
       color:
         (analytics?.lastMonthChange ?? 0) >= 0 ? "success.main" : "error.main",
@@ -180,15 +183,7 @@ export default function Dashboard() {
         <Grid container spacing={3}>
           {metrics.map((metric, index) => (
             <Grid item xs={12} sm={6} md={4} key={index}>
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  borderColor: "rgba(37, 99, 235, 0.12)",
-                  background:
-                    "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
-                }}
-              >
+              <Card variant="outlined">
                 <CardContent>
                   <Box
                     sx={{
@@ -256,15 +251,7 @@ export default function Dashboard() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  borderColor: "rgba(37, 99, 235, 0.12)",
-                  background:
-                    "linear-gradient(135deg, rgba(14,165,233,0.12) 0%, rgba(255,255,255,1) 55%)",
-                }}
-              >
+              <Card variant="outlined">
                 <CardContent>
                   <Typography
                     variant="subtitle2"
@@ -273,22 +260,14 @@ export default function Dashboard() {
                   >
                     Snapshot Totali
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     {snapshotSummary?.count ?? 0}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  borderColor: "rgba(37, 99, 235, 0.12)",
-                  background:
-                    "linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(255,255,255,1) 55%)",
-                }}
-              >
+              <Card variant="outlined">
                 <CardContent>
                   <Typography
                     variant="subtitle2"

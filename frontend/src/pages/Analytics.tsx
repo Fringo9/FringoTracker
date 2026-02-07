@@ -45,7 +45,8 @@ import {
   Close as CloseIcon,
 } from "@mui/icons-material";
 import api from "../services/api";
-import { formatCurrency } from "../utils/helpers";
+import { formatCurrency, formatCurrencyAxis } from "../utils/helpers";
+import { usePrivacyStore } from "../stores/privacyStore";
 
 const COLORS = [
   "#2563eb",
@@ -60,6 +61,7 @@ const COLORS = [
 export default function Analytics() {
   const [range, setRange] = useState("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const isObscured = usePrivacyStore((state) => state.isObscured);
 
   const { data: analytics, isLoading: loadingAnalytics } = useQuery({
     queryKey: ["analytics"],
@@ -326,10 +328,6 @@ export default function Analytics() {
           sx={{
             p: 0,
             mb: 3,
-            borderRadius: 3,
-            borderColor: "rgba(37, 99, 235, 0.12)",
-            background:
-              "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
           }}
         >
           <CardContent>
@@ -365,66 +363,72 @@ export default function Analytics() {
                 </Button>
               </Box>
             </Box>
-            <Box id="timeline-chart">
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={timelineData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={(value) =>
-                      new Date(value).toLocaleDateString("it-IT", {
-                        month: "short",
-                        year: "2-digit",
+            <Box id="timeline-chart" sx={{ overflowX: "auto" }}>
+              <Box sx={{ minWidth: 500 }}>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={timelineData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(value) =>
+                        new Date(value).toLocaleDateString("it-IT", {
+                          month: "short",
+                          year: "2-digit",
+                        })
+                      }
+                    />
+                    <YAxis
+                      tickFormatter={(value) =>
+                        formatCurrencyAxis(value, isObscured)
+                      }
+                    />
+                    <Tooltip
+                      formatter={(value: any) =>
+                        formatCurrency(value, isObscured)
+                      }
+                      labelFormatter={(label: any) =>
+                        new Date(label).toLocaleDateString("it-IT", {
+                          month: "long",
+                          year: "numeric",
+                        })
+                      }
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="valore"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="Patrimonio"
+                      connectNulls={true}
+                    />
+                    {timelineData
+                      .map((item: any, index: number) => {
+                        if (!item.isMilestone) return null;
+                        return (
+                          <ReferenceLine
+                            key={`milestone-${index}`}
+                            x={item.date}
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            label={{
+                              value: item.milestoneTitle,
+                              position: "top",
+                              fill: "#f59e0b",
+                              fontSize: 11,
+                              fontWeight: "bold",
+                              offset: 10,
+                            }}
+                          />
+                        );
                       })
-                    }
-                  />
-                  <YAxis
-                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: any) => formatCurrency(value)}
-                    labelFormatter={(label: any) =>
-                      new Date(label).toLocaleDateString("it-IT", {
-                        month: "long",
-                        year: "numeric",
-                      })
-                    }
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="valore"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="Patrimonio"
-                    connectNulls={true}
-                  />
-                  {timelineData
-                    .map((item: any, index: number) => {
-                      if (!item.isMilestone) return null;
-                      return (
-                        <ReferenceLine
-                          key={`milestone-${index}`}
-                          x={item.date}
-                          stroke="#f59e0b"
-                          strokeWidth={2}
-                          strokeDasharray="5 5"
-                          label={{
-                            value: item.milestoneTitle,
-                            position: "top",
-                            fill: "#f59e0b",
-                            fontSize: 11,
-                            fontWeight: "bold",
-                            offset: 10,
-                          }}
-                        />
-                      );
-                    })
-                    .filter((el: any) => el !== null)}
-                </LineChart>
-              </ResponsiveContainer>
+                      .filter((el: any) => el !== null)}
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
             </Box>
 
             {/* Legenda milestone */}
@@ -475,10 +479,6 @@ export default function Analytics() {
             <Card
               variant="outlined"
               sx={{
-                borderRadius: 3,
-                borderColor: "rgba(37, 99, 235, 0.12)",
-                background:
-                  "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
                 height: "100%",
               }}
             >
@@ -487,39 +487,45 @@ export default function Analytics() {
                   Distribuzione per Categoria
                 </Typography>
                 {categoryData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="40%"
-                        labelLine={false}
-                        label={false}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {categoryData.map((entry: any, index: number) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                            onClick={() => setSelectedCategory(entry.name)}
-                            style={{ cursor: "pointer" }}
+                  <Box sx={{ overflowX: "auto" }}>
+                    <Box sx={{ minWidth: 320 }}>
+                      <ResponsiveContainer width="100%" height={350}>
+                        <PieChart>
+                          <Pie
+                            data={categoryData}
+                            cx="50%"
+                            cy="40%"
+                            labelLine={false}
+                            label={false}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {categoryData.map((entry: any, index: number) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                                onClick={() => setSelectedCategory(entry.name)}
+                                style={{ cursor: "pointer" }}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: any) =>
+                              formatCurrency(value, isObscured)
+                            }
                           />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: any) => formatCurrency(value)}
-                      />
-                      <Legend
-                        verticalAlign="bottom"
-                        height={36}
-                        formatter={(value: any, entry: any) =>
-                          `${entry.payload.name}: ${entry.payload.percentage.toFixed(1)}%`
-                        }
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                          <Legend
+                            verticalAlign="bottom"
+                            height={36}
+                            formatter={(value: any, entry: any) =>
+                              `${entry.payload.name}: ${entry.payload.percentage.toFixed(1)}%`
+                            }
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Box>
                 ) : (
                   <Alert severity="info">
                     Nessun dato disponibile per la distribuzione
@@ -534,10 +540,6 @@ export default function Analytics() {
             <Card
               variant="outlined"
               sx={{
-                borderRadius: 3,
-                borderColor: "rgba(37, 99, 235, 0.12)",
-                background:
-                  "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
                 height: "100%",
               }}
             >
@@ -545,10 +547,25 @@ export default function Analytics() {
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                   Proiezioni Future (12 mesi)
                 </Typography>
-                <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+                <Box
+                  sx={{
+                    mt: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
                   {projectionData.map((proj, index) => {
-                    const scenarioColors = ["success.main", "info.main", "warning.main"];
-                    const scenarioIcons = [<TrendingUp key="up" />, <ShowChart key="show" />, <TrendingDown key="down" />];
+                    const scenarioColors = [
+                      "success.main",
+                      "info.main",
+                      "warning.main",
+                    ];
+                    const scenarioIcons = [
+                      <TrendingUp key="up" />,
+                      <ShowChart key="show" />,
+                      <TrendingDown key="down" />,
+                    ];
                     return (
                       <Box
                         key={index}
@@ -566,7 +583,8 @@ export default function Analytics() {
                           sx={{
                             p: 1,
                             borderRadius: 2,
-                            bgcolor: scenarioColors[index % scenarioColors.length],
+                            bgcolor:
+                              scenarioColors[index % scenarioColors.length],
                             color: "white",
                             display: "flex",
                             alignItems: "center",
@@ -578,11 +596,14 @@ export default function Analytics() {
                           {scenarioIcons[index % scenarioIcons.length]}
                         </Box>
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="subtitle2" color="text.secondary">
+                          <Typography
+                            variant="subtitle2"
+                            color="text.secondary"
+                          >
                             {proj.scenario}
                           </Typography>
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {formatCurrency(proj.valore)}
+                            {formatCurrency(proj.valore, isObscured)}
                           </Typography>
                         </Box>
                       </Box>
@@ -591,7 +612,7 @@ export default function Analytics() {
                 </Box>
                 <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
                   Basato su risparmio medio mensile:{" "}
-                  {formatCurrency(analytics.monthlyAvgSavings)}
+                  {formatCurrency(analytics.monthlyAvgSavings, isObscured)}
                 </Alert>
               </CardContent>
             </Card>
@@ -600,15 +621,7 @@ export default function Analytics() {
           {/* Storico categoria selezionata */}
           {selectedCategory && categoryChartData.length > 0 && (
             <Grid item xs={12}>
-              <Card
-                variant="outlined"
-                sx={{
-                  borderRadius: 3,
-                  borderColor: "rgba(37, 99, 235, 0.12)",
-                  background:
-                    "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
-                }}
-              >
+              <Card variant="outlined">
                 <CardContent>
                   <Box
                     sx={{
@@ -628,39 +641,45 @@ export default function Analytics() {
                       <CloseIcon />
                     </IconButton>
                   </Box>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={categoryChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis
-                        tickFormatter={(value) =>
-                          `€${(value / 1000).toFixed(0)}k`
-                        }
-                      />
-                      <Tooltip
-                        formatter={(value: any) => formatCurrency(value)}
-                        labelFormatter={(_: any, payload: any) =>
-                          payload?.[0]?.payload?.date
-                            ? new Date(
-                                payload[0].payload.date,
-                              ).toLocaleDateString("it-IT", {
-                                month: "long",
-                                year: "numeric",
-                              })
-                            : ""
-                        }
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke={selectedCategoryColor}
-                        fill={selectedCategoryColor}
-                        fillOpacity={0.15}
-                        strokeWidth={2}
-                        name={selectedCategory}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <Box sx={{ overflowX: "auto" }}>
+                    <Box sx={{ minWidth: 400 }}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <AreaChart data={categoryChartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="label" />
+                          <YAxis
+                            tickFormatter={(value) =>
+                              formatCurrencyAxis(value, isObscured)
+                            }
+                          />
+                          <Tooltip
+                            formatter={(value: any) =>
+                              formatCurrency(value, isObscured)
+                            }
+                            labelFormatter={(_: any, payload: any) =>
+                              payload?.[0]?.payload?.date
+                                ? new Date(
+                                    payload[0].payload.date,
+                                  ).toLocaleDateString("it-IT", {
+                                    month: "long",
+                                    year: "numeric",
+                                  })
+                                : ""
+                            }
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="value"
+                            stroke={selectedCategoryColor}
+                            fill={selectedCategoryColor}
+                            fillOpacity={0.15}
+                            strokeWidth={2}
+                            name={selectedCategory}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Box>
                 </CardContent>
               </Card>
             </Grid>
@@ -668,25 +687,26 @@ export default function Analytics() {
 
           {/* Heatmap mensile */}
           <Grid item xs={12}>
-            <Card
-              variant="outlined"
-              sx={{
-                borderRadius: 3,
-                borderColor: "rgba(37, 99, 235, 0.12)",
-                background:
-                  "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
-              }}
-            >
+            <Card variant="outlined">
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                   Heatmap Variazioni Mensili
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Variazioni del patrimonio mese per mese. Verde = crescita, Rosso = calo.
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Variazioni del patrimonio mese per mese. Verde = crescita,
+                  Rosso = calo.
                 </Typography>
                 {(() => {
-                  const heatmap: Array<{ year: number; month: number; change: number; changePercent: number }> =
-                    analytics.monthlyHeatmapData || [];
+                  const heatmap: Array<{
+                    year: number;
+                    month: number;
+                    change: number;
+                    changePercent: number;
+                  }> = analytics.monthlyHeatmapData || [];
                   if (heatmap.length === 0) {
                     return (
                       <Alert severity="info">
@@ -697,36 +717,66 @@ export default function Analytics() {
 
                   const years = [...new Set(heatmap.map((h) => h.year))].sort();
                   const MONTHS = [
-                    "Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
-                    "Lug", "Ago", "Set", "Ott", "Nov", "Dic",
+                    "Gen",
+                    "Feb",
+                    "Mar",
+                    "Apr",
+                    "Mag",
+                    "Giu",
+                    "Lug",
+                    "Ago",
+                    "Set",
+                    "Ott",
+                    "Nov",
+                    "Dic",
                   ];
 
                   // Build lookup
-                  const lookup = new Map<string, { change: number; changePercent: number }>();
+                  const lookup = new Map<
+                    string,
+                    { change: number; changePercent: number }
+                  >();
                   let maxAbs = 0;
                   heatmap.forEach((h) => {
-                    lookup.set(`${h.year}-${h.month}`, { change: h.change, changePercent: h.changePercent });
-                    if (Math.abs(h.change) > maxAbs) maxAbs = Math.abs(h.change);
+                    lookup.set(`${h.year}-${h.month}`, {
+                      change: h.change,
+                      changePercent: h.changePercent,
+                    });
+                    if (Math.abs(h.change) > maxAbs)
+                      maxAbs = Math.abs(h.change);
                   });
 
                   const getColor = (change: number) => {
                     if (maxAbs === 0) return "rgba(200,200,200,0.3)";
                     const intensity = Math.min(Math.abs(change) / maxAbs, 1);
-                    if (change > 0) return `rgba(34,197,94,${0.15 + intensity * 0.7})`;
-                    if (change < 0) return `rgba(239,68,68,${0.15 + intensity * 0.7})`;
+                    if (change > 0)
+                      return `rgba(34,197,94,${0.15 + intensity * 0.7})`;
+                    if (change < 0)
+                      return `rgba(239,68,68,${0.15 + intensity * 0.7})`;
                     return "rgba(200,200,200,0.3)";
                   };
 
                   return (
                     <Box sx={{ overflowX: "auto" }}>
-                      <Box sx={{ display: "grid", gridTemplateColumns: `60px repeat(12, 1fr)`, gap: 0.5, minWidth: 600 }}>
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: `60px repeat(12, 1fr)`,
+                          gap: 0.5,
+                          minWidth: 600,
+                        }}
+                      >
                         {/* Header row */}
                         <Box />
                         {MONTHS.map((m) => (
                           <Typography
                             key={m}
                             variant="caption"
-                            sx={{ textAlign: "center", fontWeight: 600, color: "text.secondary" }}
+                            sx={{
+                              textAlign: "center",
+                              fontWeight: 600,
+                              color: "text.secondary",
+                            }}
                           >
                             {m}
                           </Typography>
@@ -738,7 +788,11 @@ export default function Analytics() {
                             <Typography
                               key={`label-${year}`}
                               variant="caption"
-                              sx={{ fontWeight: 700, display: "flex", alignItems: "center" }}
+                              sx={{
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                              }}
                             >
                               {year}
                             </Typography>
@@ -749,7 +803,7 @@ export default function Analytics() {
                                   key={`${year}-${monthIdx}`}
                                   title={
                                     data
-                                      ? `${MONTHS[monthIdx]} ${year}: ${formatCurrency(data.change)} (${data.changePercent.toFixed(2)}%)`
+                                      ? `${MONTHS[monthIdx]} ${year}: ${formatCurrency(data.change, isObscured)} (${data.changePercent.toFixed(2)}%)`
                                       : `${MONTHS[monthIdx]} ${year}: Nessun dato`
                                   }
                                   arrow
@@ -759,15 +813,22 @@ export default function Analytics() {
                                     sx={{
                                       height: 40,
                                       borderRadius: 1,
-                                      bgcolor: data ? getColor(data.change) : "rgba(200,200,200,0.1)",
+                                      bgcolor: data
+                                        ? getColor(data.change)
+                                        : "rgba(200,200,200,0.1)",
                                       border: "1px solid",
-                                      borderColor: data ? "transparent" : "rgba(200,200,200,0.3)",
+                                      borderColor: data
+                                        ? "transparent"
+                                        : "rgba(200,200,200,0.3)",
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "center",
                                       cursor: "default",
                                       transition: "transform 0.1s",
-                                      "&:hover": { transform: "scale(1.08)", zIndex: 1 },
+                                      "&:hover": {
+                                        transform: "scale(1.08)",
+                                        zIndex: 1,
+                                      },
                                     }}
                                   >
                                     {data && (
@@ -776,7 +837,10 @@ export default function Analytics() {
                                         sx={{
                                           fontSize: "0.65rem",
                                           fontWeight: 600,
-                                          color: Math.abs(data.change) / maxAbs > 0.5 ? "white" : "text.primary",
+                                          color:
+                                            Math.abs(data.change) / maxAbs > 0.5
+                                              ? "white"
+                                              : "text.primary",
                                         }}
                                       >
                                         {data.changePercent >= 0 ? "+" : ""}
@@ -792,17 +856,64 @@ export default function Analytics() {
                       </Box>
 
                       {/* Legend */}
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, mt: 2 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: "rgba(239,68,68,0.7)" }} />
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 2,
+                          mt: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: 0.5,
+                              bgcolor: "rgba(239,68,68,0.7)",
+                            }}
+                          />
                           <Typography variant="caption">Calo</Typography>
                         </Box>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: "rgba(200,200,200,0.3)" }} />
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: 0.5,
+                              bgcolor: "rgba(200,200,200,0.3)",
+                            }}
+                          />
                           <Typography variant="caption">Invariato</Typography>
                         </Box>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: "rgba(34,197,94,0.7)" }} />
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: 0.5,
+                              bgcolor: "rgba(34,197,94,0.7)",
+                            }}
+                          />
                           <Typography variant="caption">Crescita</Typography>
                         </Box>
                       </Box>
@@ -819,488 +930,379 @@ export default function Analytics() {
               Metriche di Crescita
             </Typography>
             <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "primary.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <TrendingUp />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Crescita Totale
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {analytics.cagrTotal.toFixed(2)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            CAGR composto dall'inizio del tracking
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "primary.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <TrendingUp />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Crescita Totale
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {analytics.cagrTotal.toFixed(2)}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        CAGR composto dall'inizio del tracking
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "info.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <ShowChart />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Crescita Annuale
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {analytics.cagrYoY.toFixed(2)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            CAGR calcolato sugli ultimi 12 mesi
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "info.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <ShowChart />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Crescita Annuale
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {analytics.cagrYoY.toFixed(2)}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        CAGR calcolato sugli ultimi 12 mesi
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: (analytics.absoluteChange ?? 0) >= 0 ? "success.main" : "error.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <SwapVert />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Variazione Assoluta
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {formatCurrency(analytics.absoluteChange ?? 0)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Differenza in € dal primo snapshot ad oggi
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor:
+                            (analytics.absoluteChange ?? 0) >= 0
+                              ? "success.main"
+                              : "error.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <SwapVert />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Variazione Assoluta
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {formatCurrency(
+                          analytics.absoluteChange ?? 0,
+                          isObscured,
+                        )}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Differenza in € dal primo snapshot ad oggi
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: (analytics.lastMonthChange ?? 0) >= 0 ? "success.main" : "error.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <TrendingFlat />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Variazione Ultimo Mese
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {formatCurrency(analytics.lastMonthChange ?? 0)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Variazione percentuale {Number(analytics.lastMonthChangePercent ?? 0).toFixed(2)}%
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor:
+                            (analytics.lastMonthChange ?? 0) >= 0
+                              ? "success.main"
+                              : "error.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <TrendingFlat />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Variazione Ultimo Mese
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {formatCurrency(
+                          analytics.lastMonthChange ?? 0,
+                          isObscured,
+                        )}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Variazione percentuale{" "}
+                        {Number(analytics.lastMonthChangePercent ?? 0).toFixed(
+                          2,
+                        )}
+                        %
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "secondary.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <Bolt />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Volatilità Annualizzata
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {Number(
-                              analytics.volatilityAnnualized || 0,
-                            ).toFixed(2)}
-                            %
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Oscillazione annua dei rendimenti mensili
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "secondary.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <Bolt />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Volatilità Annualizzata
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {Number(analytics.volatilityAnnualized || 0).toFixed(2)}
+                        %
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Oscillazione annua dei rendimenti mensili
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "error.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <CalendarMonth />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Autonomia
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {Math.round(analytics.runway)} mesi
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Mesi di autonomia
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "error.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <CalendarMonth />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Autonomia
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {Math.round(analytics.runway)} mesi
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Mesi di autonomia
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "error.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <TrendingDown />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Max Drawdown
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {Number(analytics.maxDrawdown || 0).toFixed(2)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Perdita massima dal picco al minimo storico
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "error.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <TrendingDown />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Max Drawdown
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {Number(analytics.maxDrawdown || 0).toFixed(2)}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Perdita massima dal picco al minimo storico
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: (analytics.debtRatio ?? 0) > 30 ? "error.main" : "success.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <Balance />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Rapporto Debito/Patrimonio
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {Number(analytics.debtRatio || 0).toFixed(2)}%
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Sotto 30% è considerato sano
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Card
-                      variant="outlined"
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor:
+                            (analytics.debtRatio ?? 0) > 30
+                              ? "error.main"
+                              : "success.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <Balance />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Rapporto Debito/Patrimonio
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {Number(analytics.debtRatio || 0).toFixed(2)}%
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Sotto 30% è considerato sano
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box
                       sx={{
-                        borderRadius: 3,
-                        borderColor: "rgba(37, 99, 235, 0.12)",
-                        background:
-                          "linear-gradient(180deg, rgba(37,99,235,0.06) 0%, rgba(255,255,255,1) 60%)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        textAlign: "center",
                       }}
                     >
-                      <CardContent>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 3,
-                              bgcolor: "primary.main",
-                              color: "white",
-                              mb: 2,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "56px",
-                            }}
-                          >
-                            <CompareArrows />
-                          </Box>
-                          <Typography
-                            variant="subtitle2"
-                            color="text.secondary"
-                          >
-                            Confronto YoY
-                          </Typography>
-                          <Typography
-                            variant="h5"
-                            sx={{ fontWeight: 700, my: 1 }}
-                          >
-                            {yoyComparison !== null
-                              ? `${yoyComparison.toFixed(2)}%`
-                              : "N/A"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Patrimonio attuale vs 12 mesi fa in %
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
+                      <Box
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: "primary.main",
+                          color: "white",
+                          mb: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "56px",
+                        }}
+                      >
+                        <CompareArrows />
+                      </Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Confronto YoY
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 700, my: 1 }}>
+                        {yoyComparison !== null
+                          ? `${yoyComparison.toFixed(2)}%`
+                          : "N/A"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Patrimonio attuale vs 12 mesi fa in %
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
           </Grid>
         </Grid>

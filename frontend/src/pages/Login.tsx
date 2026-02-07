@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Container,
+  IconButton,
   Paper,
   TextField,
   Typography,
@@ -12,7 +13,12 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
+import {
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon,
+} from "@mui/icons-material";
 import { useAuthStore } from "../stores/authStore";
+import { useThemeStore } from "../stores/themeStore";
 import api from "../services/api";
 
 export default function Login() {
@@ -27,6 +33,8 @@ export default function Login() {
   const [resetPassword, setResetPassword] = useState("");
   const [resetStatus, setResetStatus] = useState("");
   const login = useAuthStore((state) => state.login);
+  const themeMode = useThemeStore((state) => state.mode);
+  const toggleMode = useThemeStore((state) => state.toggleMode);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +89,27 @@ export default function Login() {
 
   return (
     <>
+      <IconButton
+        onClick={toggleMode}
+        sx={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          zIndex: 10,
+          bgcolor:
+            themeMode === "light"
+              ? "rgba(37,99,235,0.08)"
+              : "rgba(255,255,255,0.08)",
+          "&:hover": {
+            bgcolor:
+              themeMode === "light"
+                ? "rgba(37,99,235,0.15)"
+                : "rgba(255,255,255,0.15)",
+          },
+        }}
+      >
+        {themeMode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
+      </IconButton>
       <Box
         sx={{
           minHeight: "100vh",
@@ -88,7 +117,9 @@ export default function Login() {
           alignItems: "center",
           justifyContent: "center",
           background:
-            "radial-gradient(circle at top, rgba(37,99,235,0.18), transparent 45%), linear-gradient(180deg, #f1f7ff 0%, #f8fbff 60%, #ffffff 100%)",
+            themeMode === "light"
+              ? "radial-gradient(circle at top, rgba(37,99,235,0.18), transparent 45%), linear-gradient(180deg, #f1f7ff 0%, #f8fbff 60%, #ffffff 100%)"
+              : "radial-gradient(circle at top, rgba(37,99,235,0.25), transparent 45%), linear-gradient(180deg, #0f172a 0%, #1e293b 60%, #0f172a 100%)",
           px: 2,
         }}
       >
@@ -99,9 +130,19 @@ export default function Login() {
               p: { xs: 3, sm: 4 },
               width: "100%",
               borderRadius: 4,
-              border: "1px solid rgba(37, 99, 235, 0.12)",
-              boxShadow: "0 20px 40px rgba(37, 99, 235, 0.15)",
-              background: "rgba(255,255,255,0.92)",
+              border: "1px solid",
+              borderColor:
+                themeMode === "light"
+                  ? "rgba(37, 99, 235, 0.12)"
+                  : "rgba(255, 255, 255, 0.08)",
+              boxShadow:
+                themeMode === "light"
+                  ? "0 20px 40px rgba(37, 99, 235, 0.15)"
+                  : "0 20px 40px rgba(0, 0, 0, 0.4)",
+              background:
+                themeMode === "light"
+                  ? "rgba(255,255,255,0.92)"
+                  : "rgba(30,41,59,0.92)",
               backdropFilter: "blur(6px)",
             }}
           >

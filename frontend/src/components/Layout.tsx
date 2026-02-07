@@ -35,11 +35,15 @@ import {
   ChevronRight as ChevronRightIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
 } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
 import { useThemeStore } from "../stores/themeStore";
+import { usePrivacyStore } from "../stores/privacyStore";
+import SnapshotReminderBanner from "./SnapshotReminderBanner";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_WIDTH_COLLAPSED = 60;
@@ -60,6 +64,8 @@ export default function Layout({ children }: LayoutProps) {
   const user = useAuthStore((state) => state.user);
   const themeMode = useThemeStore((state) => state.mode);
   const toggleMode = useThemeStore((state) => state.toggleMode);
+  const isObscured = usePrivacyStore((state) => state.isObscured);
+  const toggleObscured = usePrivacyStore((state) => state.toggleObscured);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -295,25 +301,56 @@ export default function Layout({ children }: LayoutProps) {
         position="fixed"
         sx={{
           width: {
+            xs: "100%",
             sm: `calc(100% - ${drawerOpen ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED}px)`,
           },
-          ml: { sm: `${drawerOpen ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED}px` },
-          backgroundColor: "transparent",
+          ml: {
+            xs: 0,
+            sm: `${drawerOpen ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED}px`,
+          },
+          backgroundColor:
+            themeMode === "light"
+              ? "rgba(241, 247, 255, 0.85)"
+              : "rgba(15, 23, 42, 0.85)",
+          backdropFilter: "blur(12px)",
           color: "text.primary",
           boxShadow: "none",
-          borderBottom: "none",
+          borderBottom: "1px solid",
+          borderColor:
+            themeMode === "light"
+              ? "rgba(37, 99, 235, 0.08)"
+              : "rgba(255, 255, 255, 0.06)",
           transition: "margin 0.2s ease, width 0.2s ease",
-          zIndex: 0,
+          zIndex: (theme) => theme.zIndex.appBar,
         }}
       >
         <Toolbar
           sx={{
             justifyContent: "flex-end",
-            pr: 3,
+            pr: { xs: 2, sm: 3 },
             minHeight: 64,
             alignItems: "center",
           }}
         >
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 1, display: { xs: "inline-flex", sm: "none" } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton
+            onClick={toggleObscured}
+            title={isObscured ? "Mostra valori" : "Nascondi valori"}
+            sx={{
+              mr: 1,
+              color: isObscured ? "primary.main" : "text.secondary",
+            }}
+          >
+            {isObscured ? <VisibilityOffIcon /> : <VisibilityIcon />}
+          </IconButton>
           <Chip
             avatar={
               <Avatar
@@ -420,14 +457,16 @@ export default function Layout({ children }: LayoutProps) {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 1.5, sm: 3 },
           width: {
             sm: `calc(100% - ${drawerOpen ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED}px)`,
           },
           transition: "width 0.2s ease",
+          overflow: "hidden",
         }}
       >
         <Toolbar />
+        <SnapshotReminderBanner />
         {children}
       </Box>
     </Box>

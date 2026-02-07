@@ -26,10 +26,15 @@ import {
   FormControl,
   InputLabel,
 } from "@mui/material";
-import { Delete, Add as AddIcon } from "@mui/icons-material";
+import {
+  Delete,
+  Add as AddIcon,
+  ClearAll as ClearAllIcon,
+} from "@mui/icons-material";
 import api from "../services/api";
 import { formatCurrency } from "../utils/helpers";
 import { useCategories } from "../hooks/useCategories";
+import { usePrivacyStore } from "../stores/privacyStore";
 
 interface Item {
   id: string;
@@ -51,6 +56,7 @@ export default function ManualSnapshot() {
   const queryClient = useQueryClient();
   const { id: snapshotId } = useParams<{ id?: string }>();
   const { categories: CATEGORIES } = useCategories();
+  const isObscured = usePrivacyStore((state) => state.isObscured);
   const categoryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -114,6 +120,16 @@ export default function ManualSnapshot() {
     enabled: !isEditMode, // Solo quando crei una nuova snapshot
   });
 
+  // Fetch latest snapshot values for auto-fill
+  const { data: latestValues, isFetched: latestValuesFetched } = useQuery({
+    queryKey: ["latestSnapshotValues"],
+    queryFn: async () => {
+      const response = await api.get("/snapshots/latest-values");
+      return response.data;
+    },
+    enabled: !isEditMode,
+  });
+
   // Fetch snapshot if in edit mode
   const { data: snapshotToEdit, isLoading: loadingSnapshot } = useQuery({
     queryKey: ["snapshot", snapshotId],
@@ -125,24 +141,46 @@ export default function ManualSnapshot() {
     enabled: !!snapshotId,
   });
 
-  // Initialize rows from template if creating new snapshot
+  // Initialize rows from template if creating new snapshot (with auto-fill from latest values)
   useEffect(() => {
-    if (!isEditMode && templateData?.items && templateData.items.length > 0) {
-      const templateRows = templateData.items.map((item: any, idx: number) => ({
-        id: String(idx),
-        itemId: item.itemId,
-        itemName: item.itemName,
-        category:
-          items.find((i: any) => i.id === item.itemId)?.category || null,
-        value: "",
-      }));
+    // Wait until latestValues query has completed before initializing rows
+    if (
+      !isEditMode &&
+      templateData?.items &&
+      templateData.items.length > 0 &&
+      latestValuesFetched
+    ) {
+      // Build a map of latest values by itemId
+      const latestValuesMap = new Map<string, number>();
+      if (latestValues?.entries) {
+        latestValues.entries.forEach((entry: any) => {
+          latestValuesMap.set(entry.itemId, entry.value);
+        });
+      }
+
+      const templateRows = templateData.items.map((item: any, idx: number) => {
+        const lastValue = latestValuesMap.get(item.itemId);
+        return {
+          id: String(idx),
+          itemId: item.itemId,
+          itemName: item.itemName,
+          category:
+            items.find((i: any) => i.id === item.itemId)?.category || null,
+          value: lastValue !== undefined ? String(lastValue) : "",
+        };
+      });
 
       if (templateRows.length > 0) {
         setRows(templateRows);
         setRowCounter(templateRows.length + 1);
       }
     }
-  }, [templateData, isEditMode, items]);
+  }, [templateData, isEditMode, items, latestValues, latestValuesFetched]);
+
+  // Clear all values (reset to template without pre-fill)
+  const handleClearValues = () => {
+    setRows(rows.map((row) => ({ ...row, value: "" })));
+  };
 
   // Initialize rows from snapshot data if editing
   useEffect(() => {
@@ -539,17 +577,30 @@ export default function ManualSnapshot() {
                 mb: 3,
               }}
             >
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleAddRow}
-              >
-                Aggiungi Voce
-              </Button>
-              <Card sx={{ backgroundColor: "#f5f5f5" }}>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddRow}
+                >
+                  Aggiungi Voce
+                </Button>
+                {!isEditMode && (
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<ClearAllIcon />}
+                    onClick={handleClearValues}
+                    size="small"
+                  >
+                    Svuota valori
+                  </Button>
+                )}
+              </Stack>
+              <Card sx={{ bgcolor: "action.hover" }}>
                 <CardContent sx={{ py: 1, px: 2, "&:last-child": { pb: 1 } }}>
                   <Typography variant="subtitle2">
-                    Totale: <strong>{formatCurrency(total)}</strong>
+                    Totale: <strong>{formatCurrency(total, isObscured)}</strong>
                   </Typography>
                 </CardContent>
               </Card>

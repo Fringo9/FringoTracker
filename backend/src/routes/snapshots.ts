@@ -40,6 +40,57 @@ router.get("/summary", authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// Get latest snapshot values (for auto-fill in new snapshot creation)
+router.get("/latest-values", authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!;
+
+    // Get the most recent snapshot
+    const snapshotsRef = firestore.collection("snapshots");
+    const allSnapshots = await snapshotsRef.where("userId", "==", userId).get();
+
+    if (allSnapshots.empty) {
+      return res.json({ entries: [] });
+    }
+
+    // Find latest snapshot by date in-memory
+    let latestDoc: any = null;
+    let latestDate: Date | null = null;
+    allSnapshots.docs.forEach((doc: any) => {
+      const data = doc.data();
+      const date = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+      if (!latestDate || date > latestDate) {
+        latestDate = date;
+        latestDoc = doc;
+      }
+    });
+
+    if (!latestDoc) {
+      return res.json({ entries: [] });
+    }
+
+    // Fetch entries for this snapshot
+    const entriesSnapshot = await firestore
+      .collection("snapshotEntries")
+      .where("snapshotId", "==", latestDoc.id)
+      .where("userId", "==", userId)
+      .get();
+
+    const entries = entriesSnapshot.docs.map((doc: any) => {
+      const data = doc.data();
+      return {
+        itemId: data.itemId,
+        value: data.value,
+      };
+    });
+
+    res.json({ entries });
+  } catch (error) {
+    console.error("Get latest values error:", error);
+    res.status(500).json({ error: "Failed to fetch latest snapshot values" });
+  }
+});
+
 // Get all snapshots
 router.get("/", authMiddleware, async (req: AuthRequest, res) => {
   try {

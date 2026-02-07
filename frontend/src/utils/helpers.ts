@@ -53,12 +53,19 @@ export async function decryptData(
   return decoder.decode(decryptedBuffer);
 }
 
-// Format currency
-export function formatCurrency(value: number): string {
+// Format currency (with optional obscuring for privacy mode)
+export function formatCurrency(value: number, obscured?: boolean): string {
+  if (obscured) return "••••••  €";
   return new Intl.NumberFormat("it-IT", {
     style: "currency",
     currency: "EUR",
   }).format(value);
+}
+
+// Format currency for chart axis ticks (with optional obscuring)
+export function formatCurrencyAxis(value: number, obscured?: boolean): string {
+  if (obscured) return "•••";
+  return `€${(value / 1000).toFixed(0)}k`;
 }
 
 // Format percentage
