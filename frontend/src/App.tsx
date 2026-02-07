@@ -41,6 +41,7 @@ function App() {
             <Route path="/milestones/new" element={<Milestones />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </Layout>
       </BrowserRouter>
